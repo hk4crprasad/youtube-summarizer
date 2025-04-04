@@ -1,4 +1,6 @@
 import os
+import re
+import json
 import shutil
 import fnmatch
 import time
@@ -14,9 +16,14 @@ from models.auth import User, register_user, login_user_with_credentials
 from models.auth_jwt import token_required, html_token_required, generate_tokens, refresh_access_token, get_current_user
 import models.db as db
 import utils
+import datetime
+from flask_cors import CORS
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 app.secret_key = SECRET_KEY
+
+# Enable CORS for all routes and origins
+CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 
 # Initialize Flask-Login (for backward compatibility and session flash messages)
 login_manager = LoginManager()
@@ -277,6 +284,140 @@ def api_get_summary(user_id, video_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/transcript', methods=['POST'])
+@token_required
+def api_generate_transcript(user_id):
+    """API endpoint to generate a transcript from a YouTube URL."""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+        
+        youtube_url = data.get('youtube_url')
+        if not youtube_url:
+            return jsonify({"error": "YouTube URL is required"}), 400
+        
+        # Extract video ID
+        video_id = utils.extract_video_id(youtube_url)
+        if not video_id:
+            return jsonify({"error": "Invalid YouTube URL"}), 400
+        
+        # Check if transcript already exists
+        transcript = db.get_transcript(video_id)
+        
+        # If transcript doesn't exist, extract it
+        if not transcript:
+            # Extract transcript using utils
+            yt_downloader = YouTubeDownloader(video_id)
+            title = yt_downloader.get_video_title()
+            transcript_text = yt_downloader.get_transcript()
+            
+            # Save transcript to database
+            db.save_transcript(user_id, video_id, title, transcript_text)
+            
+            # Create response object
+            result = {
+                "message": "Transcript generated successfully",
+                "transcript": {
+                    "video_id": video_id,
+                    "title": title,
+                    "content": transcript_text,
+                    "created_at": datetime.datetime.now().isoformat()
+                }
+            }
+        else:
+            # Increment access count for existing transcript
+            db.increment_transcript_access(video_id, user_id)
+            
+            # Create response with existing transcript
+            result = {
+                "message": "Existing transcript retrieved",
+                "transcript": {
+                    "id": str(transcript.get("_id", "")),
+                    "video_id": transcript.get("video_id", ""),
+                    "title": transcript.get("title", ""),
+                    "content": transcript.get("content", ""),
+                    "created_at": transcript.get("created_at").isoformat() if transcript.get("created_at") else None,
+                    "access_count": transcript.get("access_count", 0)
+                }
+            }
+        
+        # Clean up temporary files
+        cleanup_temp_files(video_id)
+        
+        return jsonify(result)
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/summary', methods=['POST'])
+@token_required
+def api_generate_summary(user_id):
+    """API endpoint to generate a summary for a video that has already been transcribed."""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+        
+        video_id = data.get('video_id')
+        if not video_id:
+            return jsonify({"error": "Video ID is required"}), 400
+        
+        # Get transcript first
+        transcript = db.get_transcript(video_id)
+        if not transcript:
+            return jsonify({"error": "Transcript not found for this video ID. Generate a transcript first."}), 404
+        
+        transcript_text = transcript['content']
+        video_title = transcript['title']
+        
+        # Check if summary already exists
+        summary = db.get_summary(video_id)
+        
+        # If summary doesn't exist, generate it
+        if not summary:
+            # Generate summary using OpenAI
+            from utils.summarization import generate_summary as generate_summary_func
+            summary_text = generate_summary_func(transcript_text)
+            
+            # Save summary to database
+            db.save_summary(user_id, video_id, video_title, summary_text)
+            
+            # Create response object
+            result = {
+                "message": "Summary generated successfully",
+                "summary": {
+                    "video_id": video_id,
+                    "title": video_title,
+                    "content": summary_text,
+                    "created_at": datetime.datetime.now().isoformat()
+                }
+            }
+        else:
+            # Increment access count for existing summary
+            db.increment_summary_access(video_id, user_id)
+            
+            # Create response with existing summary
+            result = {
+                "message": "Existing summary retrieved",
+                "summary": {
+                    "id": str(summary.get("_id", "")),
+                    "video_id": summary.get("video_id", ""),
+                    "title": summary.get("title", ""),
+                    "content": summary.get("content", ""),
+                    "created_at": summary.get("created_at").isoformat() if summary.get("created_at") else None,
+                    "access_count": summary.get("access_count", 0)
+                }
+            }
+        
+        # Clean up temporary files
+        cleanup_temp_files(video_id)
+        
+        return jsonify(result)
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 # MODIFIED HTML ENDPOINTS FOR JWT
 
 @app.route('/')
@@ -465,7 +606,7 @@ def cleanup_temp_files(video_id=None):
             
             for pattern in patterns:
                 matching_files = [f for f in os.listdir(TEMP_DIRECTORY) 
-                                  if fnmatch.fnmatch(f, pattern)]
+                                if fnmatch.fnmatch(f, pattern)]
                 
                 for filename in matching_files:
                     file_path = os.path.join(TEMP_DIRECTORY, filename)
@@ -725,6 +866,15 @@ def cleanup_old_files():
     # Only run cleanup occasionally (1% of requests) to avoid performance impact
     if random.random() < 0.01:  # 1% chance
         cleanup_temp_files()
+
+@app.after_request
+def after_request(response):
+    """Add headers to every response."""
+    # Enable CORS
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    return response
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5001) 

@@ -1,0 +1,55 @@
+{
+  "id": "c73cae6d-8f3e-4d42-abf8-ba52b6be8a37",
+  "name": "YouTube Summarizer Local",
+  "values": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5000",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "username",
+      "value": "your_username",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "email",
+      "value": "your_email@example.com",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "password",
+      "value": "your_password",
+      "type": "secret",
+      "enabled": true
+    },
+    {
+      "key": "access_token",
+      "value": "",
+      "type": "secret",
+      "enabled": true
+    },
+    {
+      "key": "refresh_token",
+      "value": "",
+      "type": "secret",
+      "enabled": true
+    },
+    {
+      "key": "token_expiry",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "video_id",
+      "value": "dQw4w9WgXcQ",
+      "type": "default",
+      "enabled": true
+    }
+  ],
+  "_postman_variable_scope": "environment"
+} 
