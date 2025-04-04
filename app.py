@@ -1,13 +1,27 @@
 import os
 import shutil
-from flask import Flask, request, jsonify, render_template, send_file
+from flask import Flask, request, jsonify, render_template, send_file, redirect, url_for, flash, session
 import traceback
-from utils.youtube import process_youtube_video, is_valid_youtube_url, get_video_id
+from utils.youtube import process_youtube_video, is_valid_youtube_url, get_video_id, YouTubeDownloader
 from utils.transcription import transcribe_audio, translate_transcript
 from utils.summarization import summarize_transcript
-from config.settings import TEMP_DIRECTORY
+from config.settings import TEMP_DIRECTORY, SECRET_KEY
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+from models.auth import User, register_user, login_user_with_credentials
+import models.db as db
+import utils
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
+app.secret_key = SECRET_KEY
+
+# Initialize Flask-Login
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.get(user_id)
 
 # Ensure the temp directory exists
 os.makedirs(TEMP_DIRECTORY, exist_ok=True)
@@ -16,6 +30,91 @@ os.makedirs(TEMP_DIRECTORY, exist_ok=True)
 def index():
     """Render the home page."""
     return render_template('index.html')
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    """Handle user registration."""
+    if request.method == 'POST':
+        username = request.form.get('username')
+        email = request.form.get('email')
+        password = request.form.get('password')
+        confirm_password = request.form.get('confirm_password')
+        
+        # Basic validation
+        if not username or not email or not password:
+            flash('All fields are required', 'danger')
+            return render_template('register.html')
+        
+        if password != confirm_password:
+            flash('Passwords do not match', 'danger')
+            return render_template('register.html')
+        
+        # Register the user
+        user_id, error = register_user(username, email, password)
+        
+        if error:
+            flash(error, 'danger')
+            return render_template('register.html')
+        
+        # Log the user in automatically
+        user = User.get(user_id)
+        login_user(user)
+        
+        flash('Registration successful! Welcome to YouTube Summarizer.', 'success')
+        return redirect(url_for('dashboard'))
+    
+    return render_template('register.html')
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """Handle user login."""
+    if request.method == 'POST':
+        email = request.form.get('email')
+        password = request.form.get('password')
+        remember_me = request.form.get('remember_me', False) == 'on'
+        
+        # Validate credentials
+        user, error = login_user_with_credentials(email, password)
+        
+        if error:
+            flash(error, 'danger')
+            return render_template('login.html')
+        
+        # Log the user in
+        login_user(user, remember=remember_me)
+        
+        # Get the next page to redirect to (if any)
+        next_page = request.args.get('next')
+        
+        if not next_page or next_page.startswith('/'):
+            next_page = url_for('dashboard')
+        
+        flash('Login successful!', 'success')
+        return redirect(next_page)
+    
+    return render_template('login.html')
+
+@app.route('/logout')
+@login_required
+def logout():
+    """Handle user logout."""
+    logout_user()
+    flash('You have been logged out.', 'success')
+    return redirect(url_for('index'))
+
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    """Render the user dashboard."""
+    user_id = current_user.id
+    
+    # Get user's transcripts and summaries
+    transcripts = db.get_user_transcripts(user_id, limit=10)
+    summaries = db.get_user_summaries(user_id, limit=10)
+    
+    return render_template('dashboard.html', 
+                          transcripts=transcripts, 
+                          summaries=summaries)
 
 @app.route('/api/summarize', methods=['POST'])
 def summarize_video():
@@ -45,6 +144,45 @@ def summarize_video():
                 "error": "Invalid YouTube URL"
             }), 400
         
+        # Extract video ID
+        video_id = get_video_id(youtube_url)
+        
+        # Check if this video has already been transcribed and summarized
+        user_id = current_user.id if current_user.is_authenticated else None
+        
+        existing_transcript = db.get_transcript_by_video_id(video_id)
+        existing_summary = db.get_summary_by_video_id(video_id)
+        
+        # If both exist, return them directly
+        if existing_transcript and existing_summary:
+            print(f"Found existing transcript and summary for video: {video_id}")
+            
+            # Update the access records - user_id is the MongoDB ObjectId
+            if user_id:
+                db.transcripts.update_one(
+                    {"_id": existing_transcript["_id"]},
+                    {"$inc": {"access_count": 1}, 
+                     "$addToSet": {"accessed_by": db.ObjectId(user_id)}}
+                )
+                
+                db.summaries.update_one(
+                    {"_id": existing_summary["_id"]},
+                    {"$inc": {"access_count": 1}, 
+                     "$addToSet": {"accessed_by": db.ObjectId(user_id)}}
+                )
+            
+            return jsonify({
+                "video_id": video_id,
+                "title": existing_transcript["title"],
+                "author": "Unknown", # Not stored in DB, would need extra API call to get
+                "length_seconds": 0, # Not stored in DB
+                "summary": existing_summary["summary"],
+                "transcript": existing_transcript["transcript"],
+                "was_chunked": False,
+                "chunk_count": 1,
+                "is_cached": True
+            })
+        
         # Process the video and extract audio
         print(f"Processing video: {youtube_url}")
         try:
@@ -70,6 +208,15 @@ def summarize_video():
             traceback.print_exc()
             return jsonify({"error": f"Transcription failed: {str(e)}"}), 500
         
+        # Save the transcript to the database
+        if user_id:
+            db.save_transcript(
+                user_id, 
+                video_id, 
+                video_info['title'], 
+                transcription_info['transcript']
+            )
+        
         # Summarize the transcript
         print(f"Summarizing transcript: {transcription_info['transcript_path']}")
         try:
@@ -84,6 +231,15 @@ def summarize_video():
             traceback.print_exc()
             return jsonify({"error": f"Summarization failed: {str(e)}"}), 500
         
+        # Save the summary to the database
+        if user_id:
+            db.save_summary(
+                user_id, 
+                video_id, 
+                video_info['title'], 
+                summary_info['summary']
+            )
+        
         # Prepare the response data
         response_data = {
             "video_id": video_info['video_id'],
@@ -93,7 +249,8 @@ def summarize_video():
             "summary": summary_info['summary'],
             "transcript": transcription_info['transcript'],
             "was_chunked": video_info.get('is_chunked', False),
-            "chunk_count": transcription_info['chunk_count']
+            "chunk_count": transcription_info['chunk_count'],
+            "is_cached": False
         }
         
         # Clean up temporary files after successful processing
@@ -360,6 +517,165 @@ def serve_download(filename):
         return jsonify({
             "error": str(e)
         }), 500
+
+@app.route('/process', methods=['POST'])
+def process_video():
+    url = request.form.get('youtube_url')
+    if not url:
+        flash('Please enter a YouTube URL', 'danger')
+        return redirect(url_for('index'))
+    
+    try:
+        video_id = utils.extract_video_id(url)
+        
+        # If user is logged in, check if transcript already exists
+        transcript = None
+        if current_user.is_authenticated:
+            transcript = db.get_transcript(video_id)
+            
+        # If transcript doesn't exist, extract it
+        if not transcript:
+            # Extract transcript using utils
+            yt_downloader = YouTubeDownloader(video_id)
+            title = yt_downloader.get_video_title()
+            transcript_text = yt_downloader.get_transcript()
+            
+            # Save transcript to database if user is logged in
+            if current_user.is_authenticated:
+                db.save_transcript(video_id, current_user.id, title, transcript_text)
+            
+            # Store in session for non-logged in users
+            session['transcript'] = transcript_text
+            session['video_id'] = video_id
+            session['video_title'] = title
+        else:
+            # Increment access count for existing transcript
+            db.increment_transcript_access(video_id)
+            
+            # Store transcript from database in session
+            session['transcript'] = transcript['content']
+            session['video_id'] = video_id
+            session['video_title'] = transcript['title']
+        
+        return redirect(url_for('show_transcript'))
+    except Exception as e:
+        flash(f'Error processing video: {str(e)}', 'danger')
+        return redirect(url_for('index'))
+
+@app.route('/summary', methods=['POST'])
+def generate_summary():
+    if 'transcript' not in session or not session['transcript']:
+        flash('No transcript found. Please process a video first.', 'danger')
+        return redirect(url_for('index'))
+    
+    video_id = session.get('video_id')
+    video_title = session.get('video_title')
+    transcript = session.get('transcript')
+    
+    try:
+        # Check if summary already exists for logged in users
+        summary = None
+        if current_user.is_authenticated and video_id:
+            summary = db.get_summary(video_id)
+        
+        if not summary:
+            # Generate summary using OpenAI
+            summary_text = utils.generate_summary(transcript)
+            
+            # Save summary to database if user is logged in
+            if current_user.is_authenticated and video_id:
+                db.save_summary(video_id, current_user.id, video_title, summary_text)
+            
+            # Store in session for non-logged in users
+            session['summary'] = summary_text
+        else:
+            # Increment access count for existing summary
+            db.increment_summary_access(video_id)
+            
+            # Store summary from database in session
+            session['summary'] = summary['content']
+        
+        return redirect(url_for('show_summary'))
+    except Exception as e:
+        flash(f'Error generating summary: {str(e)}', 'danger')
+        return redirect(url_for('show_transcript'))
+
+@app.route('/transcript')
+def show_transcript():
+    if 'transcript' not in session or not session['transcript']:
+        flash('No transcript found. Please process a video first.', 'danger')
+        return redirect(url_for('index'))
+    
+    video_id = session.get('video_id')
+    video_title = session.get('video_title')
+    transcript = session.get('transcript')
+    
+    return render_template('transcript.html', 
+                          transcript=transcript, 
+                          video_id=video_id,
+                          video_title=video_title)
+
+@app.route('/summary')
+def show_summary():
+    if 'summary' not in session or not session['summary']:
+        flash('No summary found. Please generate a summary first.', 'danger')
+        return redirect(url_for('index'))
+    
+    video_id = session.get('video_id')
+    video_title = session.get('video_title')
+    summary = session.get('summary')
+    
+    return render_template('summary.html', 
+                          summary=summary, 
+                          video_id=video_id,
+                          video_title=video_title)
+
+@app.route('/transcript/<video_id>')
+def view_transcript(video_id):
+    if not current_user.is_authenticated:
+        flash('Please log in to view saved transcripts', 'warning')
+        return redirect(url_for('login', next=request.url))
+    
+    # User ID is the MongoDB ObjectId, video_id is a YouTube ID string
+    # No need to convert video_id to ObjectId
+    transcript = db.get_transcript(video_id)
+    if not transcript:
+        flash('Transcript not found', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    # Increment access count - pass user_id (ObjectId) separately
+    db.increment_transcript_access(video_id, current_user.id)
+    
+    # Store in session for potential summary generation
+    session['transcript'] = transcript['content']
+    session['video_id'] = video_id
+    session['video_title'] = transcript['title']
+    
+    return render_template('transcript.html', 
+                          transcript=transcript['content'], 
+                          video_id=video_id,
+                          video_title=transcript['title'])
+
+@app.route('/summary/<video_id>')
+def view_summary(video_id):
+    if not current_user.is_authenticated:
+        flash('Please log in to view saved summaries', 'warning')
+        return redirect(url_for('login', next=request.url))
+    
+    # User ID is the MongoDB ObjectId, video_id is a YouTube ID string
+    # No need to convert video_id to ObjectId
+    summary = db.get_summary(video_id)
+    if not summary:
+        flash('Summary not found', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    # Increment access count - pass user_id (ObjectId) separately
+    db.increment_summary_access(video_id, current_user.id)
+    
+    return render_template('summary.html', 
+                          summary=summary['content'], 
+                          video_id=video_id,
+                          video_title=summary['title'])
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5001)

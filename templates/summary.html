@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Summary - YouTube Summarizer</title>
+    <link rel="icon" href="{{ url_for('static', filename='yt.svg') }}" type="image/svg+xml">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg sticky-top">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">
+                <i class="fa-brands fa-youtube me-2"></i>YouTube Summarizer
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <i class="fas fa-bars"></i>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('index') }}">Home</a>
+                    </li>
+                    {% if current_user.is_authenticated %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('logout') }}">Logout</a>
+                    </li>
+                    {% else %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('login') }}">Login</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('register') }}">Register</a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container my-5">
+        <div class="row mb-4">
+            <div class="col-md-8">
+                <h1>Summary</h1>
+                <p class="text-muted">Video ID: {{ video_id }}</p>
+            </div>
+            <div class="col-md-4 text-md-end">
+                <a href="{{ url_for('show_transcript') }}" class="btn btn-outline-primary">
+                    <i class="fas fa-file-alt me-2"></i>View Transcript
+                </a>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title video-title">{{ video_title }}</h5>
+                        <div class="video-thumbnail">
+                            <a href="https://www.youtube.com/watch?v={{ video_id }}" target="_blank">
+                                <img src="https://img.youtube.com/vi/{{ video_id }}/maxresdefault.jpg" 
+                                     onerror="this.onerror=null; this.src='https://img.youtube.com/vi/{{ video_id }}/mqdefault.jpg';"
+                                     alt="Video thumbnail" class="img-fluid">
+                                <div class="play-icon">
+                                    <i class="fas fa-play-circle"></i>
+                                </div>
+                            </a>
+                        </div>
+                        <div class="d-grid gap-2 mt-3">
+                            <a href="https://www.youtube.com/watch?v={{ video_id }}" target="_blank" class="btn btn-outline-primary">
+                                <i class="fab fa-youtube me-2"></i>Watch on YouTube
+                            </a>
+                            <button class="btn btn-outline-secondary copy-btn" data-clipboard-target="#summary-text">
+                                <i class="fas fa-copy me-2"></i>Copy Summary
+                            </button>
+                            <a href="#" class="btn btn-outline-success" id="download-btn">
+                                <i class="fas fa-download me-2"></i>Download Summary
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-8">
+                <div class="summary-container">
+                    <h2>AI-Generated Summary</h2>
+                    <div id="summary-text" class="summary">{{ summary | safe }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="theme-toggle">
+        <i class="fas fa-moon"></i>
+    </div>
+
+    <!-- Copy Success Toast -->
+    <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+        <div id="copyToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header bg-success text-white">
+                <i class="fas fa-check me-2"></i>
+                <strong class="me-auto">Success</strong>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div class="toast-body">
+                Summary copied to clipboard!
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.11/dist/clipboard.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/showdown@2.1.0/dist/showdown.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Theme toggle
+            const themeToggle = document.getElementById('theme-toggle');
+            const themeIcon = themeToggle.querySelector('i');
+            
+            // Check for saved theme preference or system preference
+            const savedTheme = localStorage.getItem('theme');
+            
+            if (savedTheme) {
+                document.documentElement.setAttribute('data-theme', savedTheme);
+                themeIcon.className = savedTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+            } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                themeIcon.className = 'fas fa-sun';
+            }
+            
+            // Theme toggle button
+            themeToggle.addEventListener('click', function() {
+                const currentTheme = document.documentElement.getAttribute('data-theme');
+                const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+                
+                document.documentElement.setAttribute('data-theme', newTheme);
+                localStorage.setItem('theme', newTheme);
+                
+                themeIcon.className = newTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+            });
+            
+            // Initialize clipboard.js
+            var clipboard = new ClipboardJS('.copy-btn');
+            
+            clipboard.on('success', function(e) {
+                var toast = new bootstrap.Toast(document.getElementById('copyToast'));
+                toast.show();
+                e.clearSelection();
+            });
+            
+            // Download summary as text file
+            document.getElementById('download-btn').addEventListener('click', function(e) {
+                e.preventDefault();
+                const summaryText = document.getElementById('summary-text').innerText;
+                const videoTitle = document.querySelector('.video-title').innerText;
+                const blob = new Blob([summaryText], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = videoTitle ? `${videoTitle} - Summary.txt` : 'youtube-summary.txt';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            });
+            
+            // Convert markdown to HTML if needed
+            function convertMarkdownToHtml() {
+                const summaryEl = document.getElementById('summary-text');
+                const text = summaryEl.innerText;
+                
+                // Check if the text might contain markdown (headers, lists, etc.)
+                if (text.match(/^#{1,6}\s|^\*\s|^\d+\.\s|-{3,}|`{1,3}|^\>|^\*{1,2}[^*]+\*{1,2}/m)) {
+                    const converter = new showdown.Converter({
+                        headerLevelStart: 3,
+                        simplifiedAutoLink: true,
+                        strikethrough: true,
+                        tables: true
+                    });
+                    const html = converter.makeHtml(text);
+                    summaryEl.innerHTML = html;
+                    summaryEl.classList.add('formatted');
+                }
+            }
+            
+            // Try to convert any markdown in the summary
+            convertMarkdownToHtml();
+        });
+    </script>
+</body>
+</html> 

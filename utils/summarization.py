@@ -8,19 +8,89 @@ from config.settings import (
     TEMP_DIRECTORY
 )
 
-def configure_openai_client():
-    """Configure and return the Azure OpenAI client."""
-    if not AZURE_OPENAI_API_KEY or not AZURE_OPENAI_ENDPOINT or not AZURE_OPENAI_DEPLOYMENT_NAME:
-        raise ValueError("Azure OpenAI credentials not configured")
+# Configure OpenAI client for Azure
+openai.api_key = AZURE_OPENAI_API_KEY
+openai.api_base = AZURE_OPENAI_ENDPOINT
+openai.api_version = AZURE_OPENAI_API_VERSION
+openai.api_type = "azure"
+
+def generate_summary(transcript_text, max_tokens=1000):
+    """
+    Generate a summary of the transcript using Azure OpenAI.
     
-    # Configure the client
-    client = openai.AzureOpenAI(
-        api_key=AZURE_OPENAI_API_KEY,
-        api_version=AZURE_OPENAI_API_VERSION,
-        azure_endpoint=AZURE_OPENAI_ENDPOINT
-    )
+    Args:
+        transcript_text (str): The transcript text to summarize
+        max_tokens (int): Maximum number of tokens for the summary
+        
+    Returns:
+        str: The generated summary
+    """
+    try:
+        # Trim the transcript if it's too long
+        # Assuming an average of 4 chars per token
+        max_chars = 16000  # Approx. 4000 tokens for context
+        if len(transcript_text) > max_chars:
+            transcript_text = transcript_text[:max_chars] + "..."
+        
+        # Prepare the prompt
+        prompt = f"""
+        Generate a comprehensive summary of the following video transcript. 
+        Include all the main points, key information, and important details.
+        Organize the summary in clear sections with appropriate headings.
+        
+        TRANSCRIPT:
+        {transcript_text}
+        
+        SUMMARY:
+        """
+        
+        # Call the OpenAI API
+        response = openai.Completion.create(
+            engine=AZURE_OPENAI_DEPLOYMENT_NAME,
+            prompt=prompt,
+            max_tokens=max_tokens,
+            temperature=0.5,
+            top_p=0.8,
+            frequency_penalty=0.2,
+            presence_penalty=0.2
+        )
+        
+        summary = response.choices[0].text.strip()
+        return summary
     
-    return client
+    except Exception as e:
+        raise Exception(f"Error generating summary: {str(e)}")
+
+def summarize_transcript(transcript_text, video_id, title="YouTube Video"):
+    """
+    Summarize a transcript and save the summary to a file.
+    
+    Args:
+        transcript_text (str): The transcript text to summarize
+        video_id (str): The YouTube video ID
+        title (str): The title of the video
+        
+    Returns:
+        dict: Summary information including the summary text and file path
+    """
+    try:
+        # Generate the summary
+        summary = generate_summary(transcript_text)
+        
+        # Save the summary to a file
+        summary_path = os.path.join(TEMP_DIRECTORY, f"{video_id}_summary.txt")
+        with open(summary_path, 'w', encoding='utf-8') as f:
+            f.write(summary)
+        
+        return {
+            "summary": summary,
+            "summary_path": summary_path,
+            "video_id": video_id,
+            "title": title
+        }
+    
+    except Exception as e:
+        raise Exception(f"Error summarizing transcript: {str(e)}")
 
 def chunk_text(text, max_chunk_size=8000):
     """Split text into chunks of maximum size."""

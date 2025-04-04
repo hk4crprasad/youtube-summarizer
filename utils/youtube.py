@@ -476,4 +476,80 @@ def download_video_by_itag(url, itag):
         }
     
     except Exception as e:
-        raise Exception(f"Error downloading video: {str(e)}") 
+        raise Exception(f"Error downloading video: {str(e)}")
+
+class YouTubeDownloader:
+    """Class to handle YouTube video downloads and transcript extraction."""
+    
+    def __init__(self, video_id):
+        """Initialize with a YouTube video ID."""
+        self.video_id = video_id
+        self.url = f"https://www.youtube.com/watch?v={video_id}"
+        self.yt = None
+        self._initialize_youtube()
+    
+    def _initialize_youtube(self):
+        """Initialize the YouTube object."""
+        try:
+            self.yt = YouTube(self.url, use_oauth=True)
+        except Exception as e:
+            raise Exception(f"Error initializing YouTube: {str(e)}")
+    
+    def get_video_title(self):
+        """Get the title of the YouTube video."""
+        if not self.yt:
+            self._initialize_youtube()
+        return self.yt.title
+    
+    def get_transcript(self):
+        """Get the transcript of the YouTube video."""
+        try:
+            # Download the audio
+            audio_info = download_youtube_audio(self.url)
+            
+            # Use the audio to get the transcript
+            from utils.transcription import transcribe_audio
+            
+            # Transcribe the audio
+            transcription_info = transcribe_audio(
+                [audio_info['audio_path']], 
+                self.video_id
+            )
+            
+            # Clean up temporary audio file after transcription
+            if os.path.exists(audio_info['audio_path']):
+                os.remove(audio_info['audio_path'])
+            
+            return transcription_info['transcript']
+        except Exception as e:
+            raise Exception(f"Error getting transcript: {str(e)}")
+    
+    def download_video(self, output_path=None, resolution="720p"):
+        """Download the video at the specified resolution."""
+        if not self.yt:
+            self._initialize_youtube()
+        
+        if not output_path:
+            output_path = os.path.join(TEMP_DIRECTORY, f"{self.video_id}.mp4")
+        
+        try:
+            # Get the appropriate stream
+            stream = self.yt.streams.filter(
+                progressive=True, 
+                file_extension='mp4',
+                resolution=resolution
+            ).first()
+            
+            # If no stream with the specified resolution, get the highest resolution
+            if not stream:
+                stream = self.yt.streams.filter(
+                    progressive=True,
+                    file_extension='mp4'
+                ).order_by('resolution').desc().first()
+            
+            # Download the video
+            stream.download(filename=output_path)
+            
+            return output_path
+        except Exception as e:
+            raise Exception(f"Error downloading video: {str(e)}") 

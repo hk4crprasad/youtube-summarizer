@@ -8,3 +8,8 @@ azure-storage-blob
 ffmpeg-python
 moviepy
 pytubefix
+pymongo
+flask-login
+bcrypt
+flask-wtf
+dnspython
