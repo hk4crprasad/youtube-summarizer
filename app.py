@@ -3,7 +3,7 @@ import shutil
 import fnmatch
 import time
 import random
-from flask import Flask, request, jsonify, render_template, send_file, redirect, url_for, flash, session
+from flask import Flask, request, jsonify, render_template, send_file, redirect, url_for, flash, session, make_response
 import traceback
 from utils.youtube import process_youtube_video, is_valid_youtube_url, get_video_id, YouTubeDownloader
 from utils.transcription import transcribe_audio, translate_transcript
@@ -11,18 +11,14 @@ from utils.summarization import summarize_transcript, generate_summary
 from config.settings import TEMP_DIRECTORY, SECRET_KEY
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from models.auth import User, register_user, login_user_with_credentials
+from models.auth_jwt import token_required, html_token_required, generate_tokens, refresh_access_token, get_current_user
 import models.db as db
 import utils
-from utils.auth import generate_token, token_required
-from flask_cors import CORS
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 app.secret_key = SECRET_KEY
 
-# Enable CORS for API endpoints
-CORS(app, resources={r"/api/*": {"origins": "*"}})
-
-# Initialize Flask-Login
+# Initialize Flask-Login (for backward compatibility and session flash messages)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
@@ -34,14 +30,265 @@ def load_user(user_id):
 # Ensure the temp directory exists
 os.makedirs(TEMP_DIRECTORY, exist_ok=True)
 
+# API ENDPOINTS FOR JWT AUTHENTICATION
+
+@app.route('/api/auth/login', methods=['POST'])
+def api_login():
+    """API endpoint for user login with JWT."""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+        
+        email = data.get('email')
+        password = data.get('password')
+        
+        if not email or not password:
+            return jsonify({"error": "Email and password are required"}), 400
+        
+        # Validate credentials
+        user, error = login_user_with_credentials(email, password)
+        
+        if error:
+            return jsonify({"error": error}), 401
+        
+        # Generate tokens
+        tokens = generate_tokens(user.id)
+        
+        # Return tokens
+        return jsonify({
+            "message": "Login successful",
+            "user": {
+                "id": user.id,
+                "username": user.username,
+                "email": user.email
+            },
+            **tokens
+        })
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/auth/register', methods=['POST'])
+def api_register():
+    """API endpoint for user registration with JWT."""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+        
+        username = data.get('username')
+        email = data.get('email')
+        password = data.get('password')
+        
+        if not username or not email or not password:
+            return jsonify({"error": "Username, email, and password are required"}), 400
+        
+        # Register the user
+        user_id, error = register_user(username, email, password)
+        
+        if error:
+            return jsonify({"error": error}), 400
+        
+        # Generate tokens
+        tokens = generate_tokens(user_id)
+        
+        # Get user info
+        user = User.get(user_id)
+        
+        # Return tokens
+        return jsonify({
+            "message": "Registration successful",
+            "user": {
+                "id": user.id,
+                "username": user.username,
+                "email": user.email
+            },
+            **tokens
+        })
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/auth/refresh', methods=['POST'])
+def api_refresh_token():
+    """API endpoint to refresh an access token using a refresh token."""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+        
+        refresh_token = data.get('refresh_token')
+        
+        if not refresh_token:
+            return jsonify({"error": "Refresh token is required"}), 400
+        
+        # Refresh access token
+        tokens = refresh_access_token(refresh_token)
+        
+        if not tokens:
+            return jsonify({"error": "Invalid or expired refresh token"}), 401
+        
+        # Return new access token
+        return jsonify({
+            "message": "Token refreshed successfully",
+            **tokens
+        })
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/user/profile', methods=['GET'])
+@token_required
+def api_user_profile(user_id):
+    """API endpoint to get user profile information."""
+    try:
+        user = User.get(user_id)
+        
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+        
+        return jsonify({
+            "user": {
+                "id": user.id,
+                "username": user.username,
+                "email": user.email,
+                "created_at": user.created_at.isoformat() if hasattr(user, 'created_at') else None,
+                "last_login": user.last_login.isoformat() if hasattr(user, 'last_login') else None
+            }
+        })
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/user/transcripts', methods=['GET'])
+@token_required
+def api_user_transcripts(user_id):
+    """API endpoint to get user's transcripts."""
+    try:
+        limit = int(request.args.get('limit', 10))
+        skip = int(request.args.get('skip', 0))
+        
+        transcripts = db.get_user_transcripts(user_id, limit=limit, skip=skip)
+        
+        # Format for API response
+        formatted_transcripts = []
+        for transcript in transcripts:
+            formatted_transcripts.append({
+                "id": str(transcript["_id"]),
+                "video_id": transcript["video_id"],
+                "title": transcript["title"],
+                "created_at": transcript["created_at"].isoformat(),
+                "access_count": transcript["access_count"]
+            })
+        
+        return jsonify({
+            "transcripts": formatted_transcripts,
+            "count": len(formatted_transcripts),
+            "limit": limit,
+            "skip": skip
+        })
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/user/summaries', methods=['GET'])
+@token_required
+def api_user_summaries(user_id):
+    """API endpoint to get user's summaries."""
+    try:
+        limit = int(request.args.get('limit', 10))
+        skip = int(request.args.get('skip', 0))
+        
+        summaries = db.get_user_summaries(user_id, limit=limit, skip=skip)
+        
+        # Format for API response
+        formatted_summaries = []
+        for summary in summaries:
+            formatted_summaries.append({
+                "id": str(summary["_id"]),
+                "video_id": summary["video_id"],
+                "title": summary["title"],
+                "created_at": summary["created_at"].isoformat(),
+                "access_count": summary["access_count"]
+            })
+        
+        return jsonify({
+            "summaries": formatted_summaries,
+            "count": len(formatted_summaries),
+            "limit": limit,
+            "skip": skip
+        })
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/transcript/<video_id>', methods=['GET'])
+@token_required
+def api_get_transcript(user_id, video_id):
+    """API endpoint to get a specific transcript."""
+    try:
+        transcript = db.get_transcript(video_id)
+        
+        if not transcript:
+            return jsonify({"error": "Transcript not found"}), 404
+        
+        # Update access stats
+        db.increment_transcript_access(video_id, user_id)
+        
+        return jsonify({
+            "transcript": {
+                "id": transcript["id"],
+                "video_id": transcript["video_id"],
+                "title": transcript["title"],
+                "content": transcript["content"],
+                "created_at": transcript["created_at"].isoformat() if hasattr(transcript["created_at"], 'isoformat') else None,
+                "access_count": transcript["access_count"]
+            }
+        })
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/summary/<video_id>', methods=['GET'])
+@token_required
+def api_get_summary(user_id, video_id):
+    """API endpoint to get a specific summary."""
+    try:
+        summary = db.get_summary(video_id)
+        
+        if not summary:
+            return jsonify({"error": "Summary not found"}), 404
+        
+        # Update access stats
+        db.increment_summary_access(video_id, user_id)
+        
+        return jsonify({
+            "summary": {
+                "id": summary["id"],
+                "video_id": summary["video_id"],
+                "title": summary["title"],
+                "content": summary["content"],
+                "created_at": summary["created_at"].isoformat() if hasattr(summary["created_at"], 'isoformat') else None,
+                "access_count": summary["access_count"]
+            }
+        })
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# MODIFIED HTML ENDPOINTS FOR JWT
+
 @app.route('/')
 def index():
     """Render the home page."""
-    return render_template('index.html')
+    # Get current user from JWT token if available
+    user = get_current_user()
+    return render_template('index.html', current_user=user)
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
-    """Handle user registration."""
+    """Handle user registration with JWT."""
     if request.method == 'POST':
         username = request.form.get('username')
         email = request.form.get('email')
@@ -64,18 +311,23 @@ def register():
             flash(error, 'danger')
             return render_template('register.html')
         
-        # Log the user in automatically
-        user = User.get(user_id)
-        login_user(user)
+        # Generate tokens
+        tokens = generate_tokens(user_id)
         
         flash('Registration successful! Welcome to YouTube Summarizer.', 'success')
-        return redirect(url_for('dashboard'))
+        
+        # Create response with tokens in cookies
+        response = make_response(redirect(url_for('dashboard')))
+        response.set_cookie('access_token', tokens['access_token'], httponly=True, max_age=3600) # 1 hour
+        response.set_cookie('refresh_token', tokens['refresh_token'], httponly=True, max_age=2592000) # 30 days
+        
+        return response
     
     return render_template('register.html')
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    """Handle user login."""
+    """Handle user login with JWT."""
     if request.method == 'POST':
         email = request.form.get('email')
         password = request.form.get('password')
@@ -88,8 +340,13 @@ def login():
             flash(error, 'danger')
             return render_template('login.html')
         
-        # Log the user in
+        # Generate tokens
+        tokens = generate_tokens(user.id)
+        
+        # For backward compatibility and flash messages
         login_user(user, remember=remember_me)
+        
+        flash('Login successful!', 'success')
         
         # Get the next page to redirect to (if any)
         next_page = request.args.get('next')
@@ -97,193 +354,96 @@ def login():
         if not next_page or next_page.startswith('/'):
             next_page = url_for('dashboard')
         
-        flash('Login successful!', 'success')
-        return redirect(next_page)
+        # Create response with tokens in cookies
+        response = make_response(redirect(next_page))
+        response.set_cookie('access_token', tokens['access_token'], httponly=True, max_age=3600) # 1 hour
+        response.set_cookie('refresh_token', tokens['refresh_token'], httponly=True, max_age=2592000 if remember_me else None) # 30 days if remember me
+        
+        # Also set tokens in a non-httpOnly cookie for JavaScript
+        response.set_cookie('jwt_access_token_expiry', str(3600), max_age=3600, httponly=False)  # Not sensitive
+        
+        return response
     
     return render_template('login.html')
 
 @app.route('/logout')
-@login_required
 def logout():
-    """Handle user logout."""
+    """Handle user logout with JWT."""
+    # For backward compatibility and flash messages
     logout_user()
+    
     flash('You have been logged out.', 'success')
-    return redirect(url_for('index'))
+    
+    # Create response and clear token cookies
+    response = make_response(redirect(url_for('index')))
+    response.delete_cookie('access_token')
+    response.delete_cookie('refresh_token')
+    
+    return response
 
 @app.route('/dashboard')
-@login_required
-def dashboard():
+@html_token_required
+def dashboard(user_id):
     """Render the user dashboard."""
-    user_id = current_user.id
-    
     # Get user's transcripts and summaries
     transcripts = db.get_user_transcripts(user_id, limit=10)
     summaries = db.get_user_summaries(user_id, limit=10)
     
+    # Get user info
+    user = User.get(user_id)
+    
     return render_template('dashboard.html', 
                           transcripts=transcripts, 
-                          summaries=summaries)
+                          summaries=summaries,
+                          current_user=user)
 
-@app.route('/api/summarize', methods=['POST'])
-@token_required
-def summarize_video():
-    """
-    API endpoint to summarize a YouTube video.
+@app.route('/transcript/<video_id>')
+@html_token_required
+def view_transcript(user_id, video_id):
+    # Get transcript
+    transcript = db.get_transcript(video_id)
+    if not transcript:
+        flash('Transcript not found', 'danger')
+        return redirect(url_for('dashboard'))
     
-    Expected JSON input:
-    {
-        "youtube_url": "https://www.youtube.com/watch?v=...",
-        "chunk_duration": 600,  // Optional: chunk duration in seconds, default 600 (10 minutes)
-        "preferred_quality": "highest"  // Optional: audio quality (highest, medium, lowest)
-    }
-    """
-    try:
-        data = request.json
-        youtube_url = data.get('youtube_url')
-        chunk_duration = int(data.get('chunk_duration', 600))  # Default 10 min chunks
-        preferred_quality = data.get('preferred_quality', 'highest')  # Default to highest quality
-        
-        if not youtube_url:
-            return jsonify({
-                "error": "YouTube URL is required"
-            }), 400
-        
-        if not is_valid_youtube_url(youtube_url):
-            return jsonify({
-                "error": "Invalid YouTube URL"
-            }), 400
-        
-        # Extract video ID
-        video_id = get_video_id(youtube_url)
-        
-        # Check if this video has already been transcribed and summarized
-        user_id = request.user.id
-        
-        existing_transcript = db.get_transcript_by_video_id(video_id)
-        existing_summary = db.get_summary_by_video_id(video_id)
-        
-        # If both exist, return them directly
-        if existing_transcript and existing_summary:
-            print(f"Found existing transcript and summary for video: {video_id}")
-            
-            # Update the access records - user_id is the MongoDB ObjectId
-            db.transcripts.update_one(
-                {"_id": existing_transcript["_id"]},
-                {"$inc": {"access_count": 1}, 
-                 "$addToSet": {"accessed_by": db.ObjectId(user_id)}}
-            )
-            
-            db.summaries.update_one(
-                {"_id": existing_summary["_id"]},
-                {"$inc": {"access_count": 1}, 
-                 "$addToSet": {"accessed_by": db.ObjectId(user_id)}}
-            )
-            
-            return jsonify({
-                "video_id": video_id,
-                "title": existing_transcript["title"],
-                "author": "Unknown", # Not stored in DB, would need extra API call to get
-                "length_seconds": 0, # Not stored in DB
-                "summary": existing_summary["summary"],
-                "transcript": existing_transcript["transcript"],
-                "was_chunked": False,
-                "chunk_count": 1,
-                "is_cached": True
-            })
-        
-        # Process the video and extract audio
-        print(f"Processing video: {youtube_url}")
-        try:
-            video_info = process_youtube_video(youtube_url, chunk_duration, preferred_quality)
-            print(f"Audio downloaded successfully")
-            print(f"Audio chunks: {len(video_info['audio_paths'])}")
-        except Exception as e:
-            print(f"Error in audio processing: {str(e)}")
-            traceback.print_exc()
-            return jsonify({"error": f"Audio processing failed: {str(e)}"}), 500
-        
-        # Transcribe the audio
-        print(f"Transcribing audio chunks: {len(video_info['audio_paths'])}")
-        try:
-            transcription_info = transcribe_audio(
-                video_info['audio_paths'], 
-                video_info['video_id']
-            )
-            print(f"Transcription successful - length: {len(transcription_info['transcript'])} characters")
-            print(f"Processed {transcription_info['chunk_count']} audio chunks")
-        except Exception as e:
-            print(f"Error in transcription: {str(e)}")
-            traceback.print_exc()
-            return jsonify({"error": f"Transcription failed: {str(e)}"}), 500
-        
-        # Save the transcript to the database
-        db.save_transcript(
-            user_id, 
-            video_id, 
-            video_info['title'], 
-            transcription_info['transcript']
-        )
-        
-        # Summarize the transcript
-        print(f"Summarizing transcript: {transcription_info['transcript_path']}")
-        try:
-            summary_info = summarize_transcript(
-                transcription_info['transcript'], 
-                video_info['video_id'],
-                video_info['title']
-            )
-            print(f"Summarization successful - length: {len(summary_info['summary'])} characters")
-        except Exception as e:
-            print(f"Error in summarization: {str(e)}")
-            traceback.print_exc()
-            return jsonify({"error": f"Summarization failed: {str(e)}"}), 500
-        
-        # Save the summary to the database
-        db.save_summary(
-            user_id, 
-            video_id, 
-            video_info['title'], 
-            summary_info['summary']
-        )
-        
-        # Prepare the response data
-        response_data = {
-            "video_id": video_info['video_id'],
-            "title": video_info['title'],
-            "author": video_info['author'],
-            "length_seconds": video_info['length'],
-            "summary": summary_info['summary'],
-            "transcript": transcription_info['transcript'],
-            "was_chunked": video_info.get('is_chunked', False),
-            "chunk_count": transcription_info['chunk_count'],
-            "is_cached": False
-        }
-        
-        # Clean up temporary files after successful processing
-        try:
-            # Get list of files to clean up (audio files)
-            audio_files_to_remove = video_info.get('audio_paths', [])
-            
-            # Remove audio files as they're no longer needed
-            for file_path in audio_files_to_remove:
-                if os.path.exists(file_path):
-                    os.remove(file_path)
-                    print(f"Removed temporary file: {file_path}")
-            
-            print("Temporary audio files cleaned up successfully")
-        except Exception as e:
-            print(f"Warning: Failed to clean up some temporary files: {str(e)}")
-            # Continue with response even if cleanup failed
-        
-        # Return the results
-        return jsonify(response_data)
+    # Increment access count
+    db.increment_transcript_access(video_id, user_id)
     
-    except Exception as e:
-        print(f"Unexpected error: {str(e)}")
-        traceback.print_exc()
-        return jsonify({
-            "error": str(e)
-        }), 500
+    # Store in session for potential summary generation
+    session['video_id'] = video_id
+    session['video_title'] = transcript['title']
+    
+    # Get user info
+    user = User.get(user_id)
+    
+    return render_template('transcript.html', 
+                          transcript=transcript['content'], 
+                          video_id=video_id,
+                          video_title=transcript['title'],
+                          current_user=user)
+
+@app.route('/summary/<video_id>')
+@html_token_required
+def view_summary(user_id, video_id):
+    # Get summary
+    summary = db.get_summary(video_id)
+    if not summary:
+        flash('Summary not found', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    # Increment access count
+    db.increment_summary_access(video_id, user_id)
+    
+    # Get user info
+    user = User.get(user_id)
+    
+    return render_template('summary.html', 
+                          summary=summary['content'], 
+                          video_id=video_id,
+                          video_title=summary['title'],
+                          current_user=user)
+
+# EXISTING ENDPOINTS UPDATED FOR BOTH JWT AND SESSION COMPATIBILITY
 
 def cleanup_temp_files(video_id=None):
     """
@@ -345,9 +505,13 @@ def process_video():
     try:
         video_id = utils.extract_video_id(url)
         
+        # Get current user if available
+        current_user_obj = get_current_user()
+        user_id = current_user_obj.id if current_user_obj else None
+        
         # If user is logged in, check if transcript already exists
         transcript = None
-        if current_user.is_authenticated:
+        if user_id:
             transcript = db.get_transcript(video_id)
             
         # If transcript doesn't exist, extract it
@@ -358,8 +522,8 @@ def process_video():
             transcript_text = yt_downloader.get_transcript()
             
             # Save transcript to database if user is logged in
-            if current_user.is_authenticated:
-                db.save_transcript(current_user.id, video_id, title, transcript_text)
+            if user_id:
+                db.save_transcript(user_id, video_id, title, transcript_text)
             else:
                 # For non-logged in users, save to a temporary file
                 transcript_path = os.path.join(TEMP_DIRECTORY, f"{video_id}_transcript.txt")
@@ -374,7 +538,7 @@ def process_video():
             cleanup_temp_files(video_id)
         else:
             # Increment access count for existing transcript
-            db.increment_transcript_access(video_id)
+            db.increment_transcript_access(video_id, user_id)
             
             # Store metadata in session
             session['video_id'] = video_id
@@ -397,8 +561,11 @@ def show_transcript():
     # Get transcript content
     transcript_text = None
     
+    # Get current user if available
+    current_user_obj = get_current_user()
+    
     # Try to get transcript from database first
-    if current_user.is_authenticated:
+    if current_user_obj:
         transcript = db.get_transcript(video_id)
         if transcript:
             transcript_text = transcript['content']
@@ -417,10 +584,11 @@ def show_transcript():
     return render_template('transcript.html', 
                           transcript=transcript_text, 
                           video_id=video_id,
-                          video_title=video_title)
+                          video_title=video_title,
+                          current_user=current_user_obj)
 
 @app.route('/summary', methods=['POST'])
-def generate_summary():
+def generate_summary_route():
     if 'video_id' not in session:
         flash('No video found. Please process a video first.', 'danger')
         return redirect(url_for('index'))
@@ -432,8 +600,12 @@ def generate_summary():
         # Get transcript content first
         transcript_text = None
         
+        # Get current user if available
+        current_user_obj = get_current_user()
+        user_id = current_user_obj.id if current_user_obj else None
+        
         # Try to get transcript from database
-        if current_user.is_authenticated:
+        if user_id:
             transcript = db.get_transcript(video_id)
             if transcript:
                 transcript_text = transcript['content']
@@ -451,7 +623,7 @@ def generate_summary():
         
         # Check if summary already exists for logged in users
         summary = None
-        if current_user.is_authenticated:
+        if user_id:
             summary = db.get_summary(video_id)
         
         if not summary:
@@ -460,8 +632,8 @@ def generate_summary():
             summary_text = generate_summary_func(transcript_text)
             
             # Save summary to database if user is logged in
-            if current_user.is_authenticated:
-                db.save_summary(current_user.id, video_id, video_title, summary_text)
+            if user_id:
+                db.save_summary(user_id, video_id, video_title, summary_text)
             else:
                 # For non-logged in users, save to a temporary file
                 summary_path = os.path.join(TEMP_DIRECTORY, f"{video_id}_summary.txt")
@@ -472,7 +644,7 @@ def generate_summary():
             cleanup_temp_files(video_id)
         else:
             # Increment access count for existing summary
-            db.increment_summary_access(video_id)
+            db.increment_summary_access(video_id, user_id)
         
         return redirect(url_for('show_summary'))
     except Exception as e:
@@ -491,8 +663,11 @@ def show_summary():
     # Get summary content
     summary_text = None
     
+    # Get current user if available
+    current_user_obj = get_current_user()
+    
     # Try to get summary from database first
-    if current_user.is_authenticated:
+    if current_user_obj:
         summary = db.get_summary(video_id)
         if summary:
             summary_text = summary['content']
@@ -511,58 +686,12 @@ def show_summary():
     return render_template('summary.html', 
                           summary=summary_text, 
                           video_id=video_id,
-                          video_title=video_title)
-
-@app.route('/transcript/<video_id>')
-def view_transcript(video_id):
-    if not current_user.is_authenticated:
-        flash('Please log in to view saved transcripts', 'warning')
-        return redirect(url_for('login', next=request.url))
-    
-    # User ID is the MongoDB ObjectId, video_id is a YouTube ID string
-    # No need to convert video_id to ObjectId
-    transcript = db.get_transcript(video_id)
-    if not transcript:
-        flash('Transcript not found', 'danger')
-        return redirect(url_for('dashboard'))
-    
-    # Increment access count - pass user_id (ObjectId) separately
-    db.increment_transcript_access(video_id, current_user.id)
-    
-    # Store in session for potential summary generation
-    session['transcript'] = transcript['content']
-    session['video_id'] = video_id
-    session['video_title'] = transcript['title']
-    
-    return render_template('transcript.html', 
-                          transcript=transcript['content'], 
-                          video_id=video_id,
-                          video_title=transcript['title'])
-
-@app.route('/summary/<video_id>')
-def view_summary(video_id):
-    if not current_user.is_authenticated:
-        flash('Please log in to view saved summaries', 'warning')
-        return redirect(url_for('login', next=request.url))
-    
-    # User ID is the MongoDB ObjectId, video_id is a YouTube ID string
-    # No need to convert video_id to ObjectId
-    summary = db.get_summary(video_id)
-    if not summary:
-        flash('Summary not found', 'danger')
-        return redirect(url_for('dashboard'))
-    
-    # Increment access count - pass user_id (ObjectId) separately
-    db.increment_summary_access(video_id, current_user.id)
-    
-    return render_template('summary.html', 
-                          summary=summary['content'], 
-                          video_id=video_id,
-                          video_title=summary['title'])
+                          video_title=video_title,
+                          current_user=current_user_obj)
 
 @app.route('/api/cleanup', methods=['POST'])
 @token_required
-def cleanup_files():
+def cleanup_files(user_id):
     """API endpoint to clean up temporary files."""
     try:
         # Clean up the temp directory
@@ -574,8 +703,8 @@ def cleanup_files():
                 shutil.rmtree(TEMP_DIRECTORY)
                 os.makedirs(TEMP_DIRECTORY, exist_ok=True)
                 return jsonify({
-                    "message": "Full temporary directory cleanup completed"
-                })
+                        "message": "Full temporary directory cleanup completed"
+                    })
         else:
             return jsonify({
                 "message": f"Cleaned up {deleted_count} temporary files"
@@ -597,205 +726,5 @@ def cleanup_old_files():
     if random.random() < 0.01:  # 1% chance
         cleanup_temp_files()
 
-# API Authentication Endpoints
-@app.route('/api/auth/login', methods=['POST'])
-def api_login():
-    """API endpoint for user login and token generation."""
-    try:
-        data = request.json
-        email = data.get('email')
-        password = data.get('password')
-        
-        if not email or not password:
-            return jsonify({
-                "error": "Email and password are required"
-            }), 400
-        
-        # Validate credentials
-        user, error = login_user_with_credentials(email, password)
-        
-        if error:
-            return jsonify({
-                "error": error
-            }), 401
-        
-        # Generate token
-        token = generate_token(user.id)
-        
-        # Update last login time
-        db.update_last_login(user.id)
-        
-        return jsonify({
-            "message": "Login successful",
-            "token": token,
-            "user": {
-                "id": user.id,
-                "username": user.username,
-                "email": user.email
-            }
-        })
-    except Exception as e:
-        return jsonify({
-            "error": str(e)
-        }), 500
-
-@app.route('/api/auth/register', methods=['POST'])
-def api_register():
-    """API endpoint for user registration and token generation."""
-    try:
-        data = request.json
-        username = data.get('username')
-        email = data.get('email')
-        password = data.get('password')
-        
-        if not username or not email or not password:
-            return jsonify({
-                "error": "Username, email, and password are required"
-            }), 400
-        
-        # Register the user
-        user_id, error = register_user(username, email, password)
-        
-        if error:
-            return jsonify({
-                "error": error
-            }), 400
-        
-        # Generate token
-        token = generate_token(user_id)
-        
-        # Get user object
-        user = User.get(user_id)
-        
-        return jsonify({
-            "message": "Registration successful",
-            "token": token,
-            "user": {
-                "id": user.id,
-                "username": user.username,
-                "email": user.email
-            }
-        })
-    except Exception as e:
-        return jsonify({
-            "error": str(e)
-        }), 500
-
-@app.route('/api/auth/verify', methods=['GET'])
-@token_required
-def api_verify_token():
-    """API endpoint to verify token validity."""
-    return jsonify({
-        "message": "Token is valid",
-        "user": {
-            "id": request.user.id,
-            "username": request.user.username,
-            "email": request.user.email
-        }
-    })
-
-# API endpoint for transcript fetching
-@app.route('/api/transcript/<video_id>', methods=['GET'])
-@token_required
-def api_get_transcript(video_id):
-    """API endpoint to get a transcript by video ID."""
-    try:
-        # Get transcript from database
-        transcript = db.get_transcript(video_id)
-        
-        if not transcript:
-            return jsonify({
-                "error": "Transcript not found"
-            }), 404
-        
-        # Increment access count
-        db.increment_transcript_access(video_id, request.user.id)
-        
-        return jsonify({
-            "video_id": video_id,
-            "title": transcript['title'],
-            "transcript": transcript['content'],
-            "created_at": transcript['created_at'].isoformat() if hasattr(transcript['created_at'], 'isoformat') else str(transcript['created_at']),
-            "access_count": transcript['access_count']
-        })
-    except Exception as e:
-        return jsonify({
-            "error": str(e)
-        }), 500
-
-# API endpoint for summary fetching
-@app.route('/api/summary/<video_id>', methods=['GET'])
-@token_required
-def api_get_summary(video_id):
-    """API endpoint to get a summary by video ID."""
-    try:
-        # Get summary from database
-        summary = db.get_summary(video_id)
-        
-        if not summary:
-            return jsonify({
-                "error": "Summary not found"
-            }), 404
-        
-        # Increment access count
-        db.increment_summary_access(video_id, request.user.id)
-        
-        return jsonify({
-            "video_id": video_id,
-            "title": summary['title'],
-            "summary": summary['content'],
-            "created_at": summary['created_at'].isoformat() if hasattr(summary['created_at'], 'isoformat') else str(summary['created_at']),
-            "access_count": summary['access_count']
-        })
-    except Exception as e:
-        return jsonify({
-            "error": str(e)
-        }), 500
-
-# API endpoint for user's dashboard data
-@app.route('/api/dashboard', methods=['GET'])
-@token_required
-def api_dashboard():
-    """API endpoint to get user's transcripts and summaries."""
-    try:
-        user_id = request.user.id
-        
-        # Get user's transcripts and summaries
-        limit = int(request.args.get('limit', 10))
-        skip = int(request.args.get('skip', 0))
-        
-        transcripts = db.get_user_transcripts(user_id, limit, skip)
-        summaries = db.get_user_summaries(user_id, limit, skip)
-        
-        # Format the response
-        formatted_transcripts = []
-        for t in transcripts:
-            formatted_transcripts.append({
-                "id": str(t["_id"]),
-                "video_id": t["video_id"],
-                "title": t["title"],
-                "created_at": t["created_at"].isoformat() if hasattr(t["created_at"], 'isoformat') else str(t["created_at"]),
-                "access_count": t["access_count"]
-            })
-        
-        formatted_summaries = []
-        for s in summaries:
-            formatted_summaries.append({
-                "id": str(s["_id"]),
-                "video_id": s["video_id"],
-                "title": s["title"],
-                "created_at": s["created_at"].isoformat() if hasattr(s["created_at"], 'isoformat') else str(s["created_at"]),
-                "access_count": s["access_count"]
-            })
-        
-        return jsonify({
-            "transcripts": formatted_transcripts,
-            "summaries": formatted_summaries
-        })
-    except Exception as e:
-        return jsonify({
-            "error": str(e)
-        }), 500
-
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5001)
+    app.run(debug=True, host='0.0.0.0', port=5001) 
