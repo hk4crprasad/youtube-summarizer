@@ -1,5 +1,5 @@
 import os
-import openai
+from openai import AzureOpenAI
 from config.settings import (
     AZURE_OPENAI_API_KEY,
     AZURE_OPENAI_ENDPOINT,
@@ -8,11 +8,14 @@ from config.settings import (
     TEMP_DIRECTORY
 )
 
-# Configure OpenAI client for Azure
-openai.api_key = AZURE_OPENAI_API_KEY
-openai.api_base = AZURE_OPENAI_ENDPOINT
-openai.api_version = AZURE_OPENAI_API_VERSION
-openai.api_type = "azure"
+# Configure the new OpenAI client for Azure
+def get_openai_client():
+    """Get a configured Azure OpenAI client."""
+    return AzureOpenAI(
+        azure_endpoint=AZURE_OPENAI_ENDPOINT,
+        api_key=AZURE_OPENAI_API_KEY,
+        api_version=AZURE_OPENAI_API_VERSION,
+    )
 
 def generate_summary(transcript_text, max_tokens=1000):
     """
@@ -20,7 +23,7 @@ def generate_summary(transcript_text, max_tokens=1000):
     
     Args:
         transcript_text (str): The transcript text to summarize
-        max_tokens (int): Maximum number of tokens for the summary
+        max_tokens (int): Maximum number of tokens for the summary (not used)
         
     Returns:
         str: The generated summary
@@ -32,38 +35,35 @@ def generate_summary(transcript_text, max_tokens=1000):
         if len(transcript_text) > max_chars:
             transcript_text = transcript_text[:max_chars] + "..."
         
-        # Prepare the prompt
-        prompt = f"""
-        Generate a comprehensive summary of the following video transcript. 
-        Include all the main points, key information, and important details.
-        Organize the summary in clear sections with appropriate headings.
+        # Initialize the client
+        client = get_openai_client()
         
-        TRANSCRIPT:
-        {transcript_text}
+        # Create system and user messages
+        messages = [
+            {"role": "system", "content": "You are an expert video content summarizer."},
+            {"role": "user", "content": f"""Generate a comprehensive summary of the following video transcript. 
+            Include all the main points, key information, and important details.
+            Organize the summary in clear sections with appropriate headings.
+            
+            TRANSCRIPT:
+            {transcript_text}"""}
+        ]
         
-        SUMMARY:
-        """
-        
-        # Call the OpenAI API
-        response = openai.Completion.create(
-            engine=AZURE_OPENAI_DEPLOYMENT_NAME,
-            prompt=prompt,
-            max_tokens=max_tokens,
-            temperature=0.5,
-            top_p=0.8,
-            frequency_penalty=0.2,
-            presence_penalty=0.2
+        # Call the OpenAI API using the new method
+        response = client.chat.completions.create(
+            model=AZURE_OPENAI_DEPLOYMENT_NAME,
+            messages=messages,
         )
         
-        summary = response.choices[0].text.strip()
+        summary = response.choices[0].message.content.strip()
         return summary
     
     except Exception as e:
         raise Exception(f"Error generating summary: {str(e)}")
 
-def summarize_transcript(transcript_text, video_id, title="YouTube Video"):
+def simple_summarize_transcript(transcript_text, video_id, title="YouTube Video"):
     """
-    Summarize a transcript and save the summary to a file.
+    Summarize a transcript and save the summary to a file (simple version).
     
     Args:
         transcript_text (str): The transcript text to summarize
@@ -118,7 +118,8 @@ def summarize_transcript(transcript, video_id, title=None):
     Summarize transcript using Azure OpenAI.
     Returns the summary text.
     """
-    client = configure_openai_client()
+    # Initialize the client
+    client = get_openai_client()
     
     # Prepare system message
     system_message = """You are an expert video content summarizer. 
@@ -146,9 +147,7 @@ def summarize_transcript(transcript, video_id, title=None):
             messages=[
                 {"role": "system", "content": system_message},
                 {"role": "user", "content": f"Please summarize this transcript:\n\n{transcript}"}
-            ],
-            
-            
+            ]
         )
         summary = response.choices[0].message.content
     
@@ -163,9 +162,7 @@ def summarize_transcript(transcript, video_id, title=None):
                 messages=[
                     {"role": "system", "content": "Summarize this section of a transcript concisely while preserving all key information."},
                     {"role": "user", "content": f"Transcript section {i+1}/{len(transcript_chunks)}:\n\n{chunk}"}
-                ],
-                
-                
+                ]
             )
             chunk_summaries.append(chunk_response.choices[0].message.content)
         
@@ -177,9 +174,7 @@ def summarize_transcript(transcript, video_id, title=None):
             messages=[
                 {"role": "system", "content": system_message},
                 {"role": "user", "content": f"These are summaries of different sections of a transcript. Please create a cohesive, well-structured final summary:\n\n{combined_chunks}"}
-            ],
-            
-            
+            ]
         )
         summary = final_response.choices[0].message.content
     
@@ -189,5 +184,7 @@ def summarize_transcript(transcript, video_id, title=None):
     
     return {
         "summary": summary,
-        "summary_path": summary_path
+        "summary_path": summary_path,
+        "video_id": video_id,
+        "title": title if title else "YouTube Video"
     } 

@@ -1,18 +1,26 @@
 import os
 import shutil
+import fnmatch
+import time
+import random
 from flask import Flask, request, jsonify, render_template, send_file, redirect, url_for, flash, session
 import traceback
 from utils.youtube import process_youtube_video, is_valid_youtube_url, get_video_id, YouTubeDownloader
 from utils.transcription import transcribe_audio, translate_transcript
-from utils.summarization import summarize_transcript
+from utils.summarization import summarize_transcript, generate_summary
 from config.settings import TEMP_DIRECTORY, SECRET_KEY
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from models.auth import User, register_user, login_user_with_credentials
 import models.db as db
 import utils
+from utils.auth import generate_token, token_required
+from flask_cors import CORS
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 app.secret_key = SECRET_KEY
+
+# Enable CORS for API endpoints
+CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 # Initialize Flask-Login
 login_manager = LoginManager()
@@ -117,6 +125,7 @@ def dashboard():
                           summaries=summaries)
 
 @app.route('/api/summarize', methods=['POST'])
+@token_required
 def summarize_video():
     """
     API endpoint to summarize a YouTube video.
@@ -148,7 +157,7 @@ def summarize_video():
         video_id = get_video_id(youtube_url)
         
         # Check if this video has already been transcribed and summarized
-        user_id = current_user.id if current_user.is_authenticated else None
+        user_id = request.user.id
         
         existing_transcript = db.get_transcript_by_video_id(video_id)
         existing_summary = db.get_summary_by_video_id(video_id)
@@ -158,18 +167,17 @@ def summarize_video():
             print(f"Found existing transcript and summary for video: {video_id}")
             
             # Update the access records - user_id is the MongoDB ObjectId
-            if user_id:
-                db.transcripts.update_one(
-                    {"_id": existing_transcript["_id"]},
-                    {"$inc": {"access_count": 1}, 
-                     "$addToSet": {"accessed_by": db.ObjectId(user_id)}}
-                )
-                
-                db.summaries.update_one(
-                    {"_id": existing_summary["_id"]},
-                    {"$inc": {"access_count": 1}, 
-                     "$addToSet": {"accessed_by": db.ObjectId(user_id)}}
-                )
+            db.transcripts.update_one(
+                {"_id": existing_transcript["_id"]},
+                {"$inc": {"access_count": 1}, 
+                 "$addToSet": {"accessed_by": db.ObjectId(user_id)}}
+            )
+            
+            db.summaries.update_one(
+                {"_id": existing_summary["_id"]},
+                {"$inc": {"access_count": 1}, 
+                 "$addToSet": {"accessed_by": db.ObjectId(user_id)}}
+            )
             
             return jsonify({
                 "video_id": video_id,
@@ -209,13 +217,12 @@ def summarize_video():
             return jsonify({"error": f"Transcription failed: {str(e)}"}), 500
         
         # Save the transcript to the database
-        if user_id:
-            db.save_transcript(
-                user_id, 
-                video_id, 
-                video_info['title'], 
-                transcription_info['transcript']
-            )
+        db.save_transcript(
+            user_id, 
+            video_id, 
+            video_info['title'], 
+            transcription_info['transcript']
+        )
         
         # Summarize the transcript
         print(f"Summarizing transcript: {transcription_info['transcript_path']}")
@@ -232,13 +239,12 @@ def summarize_video():
             return jsonify({"error": f"Summarization failed: {str(e)}"}), 500
         
         # Save the summary to the database
-        if user_id:
-            db.save_summary(
-                user_id, 
-                video_id, 
-                video_info['title'], 
-                summary_info['summary']
-            )
+        db.save_summary(
+            user_id, 
+            video_id, 
+            video_info['title'], 
+            summary_info['summary']
+        )
         
         # Prepare the response data
         response_data = {
@@ -279,244 +285,55 @@ def summarize_video():
             "error": str(e)
         }), 500
 
-@app.route('/api/cleanup', methods=['POST'])
-def cleanup_files():
-    """API endpoint to clean up temporary files."""
-    try:
-        # Clean up the temp directory
-        if os.path.exists(TEMP_DIRECTORY):
-            shutil.rmtree(TEMP_DIRECTORY)
-            os.makedirs(TEMP_DIRECTORY, exist_ok=True)
-        
-        return jsonify({
-            "message": "Temporary files cleaned up successfully"
-        })
-    
-    except Exception as e:
-        return jsonify({
-            "error": str(e)
-        }), 500
-
-@app.route('/api/translate', methods=['POST'])
-def translate_video_transcript():
+def cleanup_temp_files(video_id=None):
     """
-    API endpoint to translate a transcript to a different language.
-    
-    Expected JSON input:
-    {
-        "transcript": "Text to translate",  // Can provide this directly
-        "video_id": "abc123",               // Optional: video ID for file naming
-        "target_language": "Spanish"        // Required: target language for translation
-    }
-    
-    OR:
-    {
-        "transcript_path": "/path/to/transcript.txt",  // Alternative to providing transcript directly
-        "target_language": "Spanish"                   // Required: target language for translation
-    }
+    Clean up temporary files for a specific video ID or all temp files if no ID provided.
+    Returns the number of files deleted.
     """
     try:
-        data = request.json
-        target_language = data.get('target_language')
-        transcript = data.get('transcript')
-        video_id = data.get('video_id')
-        transcript_path = data.get('transcript_path')
+        files_deleted = 0
         
-        # Validate required fields
-        if not target_language:
-            return jsonify({
-                "error": "Target language is required"
-            }), 400
-        
-        # If transcript not provided directly, try to read from path
-        if not transcript and transcript_path:
-            try:
-                with open(transcript_path, 'r', encoding='utf-8') as file:
-                    transcript = file.read()
-            except Exception as e:
-                return jsonify({
-                    "error": f"Failed to read transcript file: {str(e)}"
-                }), 400
-        
-        if not transcript:
-            return jsonify({
-                "error": "Transcript text or valid transcript path is required"
-            }), 400
-        
-        # Translate the transcript
-        print(f"Translating transcript to {target_language}")
-        try:
-            translation_info = translate_transcript(
-                transcript, 
-                target_language,
-                video_id
-            )
-            print(f"Translation successful - length: {len(translation_info['translated_transcript'])} characters")
-        except Exception as e:
-            print(f"Error in translation: {str(e)}")
-            traceback.print_exc()
-            return jsonify({"error": f"Translation failed: {str(e)}"}), 500
-        
-        # Prepare the response data
-        response_data = {
-            "translated_transcript": translation_info['translated_transcript'],
-            "target_language": translation_info['target_language']
-        }
-        
-        if translation_info.get('translated_path'):
-            response_data["translated_path"] = translation_info['translated_path']
-        
-        # Return the results
-        return jsonify(response_data)
-    
-    except Exception as e:
-        print(f"Unexpected error: {str(e)}")
-        traceback.print_exc()
-        return jsonify({
-            "error": str(e)
-        }), 500
-
-@app.route('/api/get_formats', methods=['POST'])
-def get_video_formats():
-    """
-    API endpoint to get available video formats for a YouTube video.
-    
-    Expected JSON input:
-    {
-        "youtube_url": "https://www.youtube.com/watch?v=..."
-    }
-    """
-    try:
-        data = request.json
-        youtube_url = data.get('youtube_url')
-        
-        if not youtube_url:
-            return jsonify({
-                "error": "YouTube URL is required"
-            }), 400
-        
-        if not is_valid_youtube_url(youtube_url):
-            return jsonify({
-                "error": "Invalid YouTube URL"
-            }), 400
-        
-        # Get video formats
-        print(f"Getting formats for video: {youtube_url}")
-        try:
-            from utils.youtube import get_video_formats
-            formats_info = get_video_formats(youtube_url)
-            print(f"Found {len(formats_info['formats'])} formats")
-        except Exception as e:
-            print(f"Error getting formats: {str(e)}")
-            traceback.print_exc()
-            return jsonify({"error": f"Failed to get video formats: {str(e)}"}), 500
-        
-        return jsonify(formats_info)
-    
-    except Exception as e:
-        print(f"Unexpected error: {str(e)}")
-        traceback.print_exc()
-        return jsonify({
-            "error": str(e)
-        }), 500
-
-@app.route('/api/download', methods=['POST'])
-def download_video():
-    """
-    API endpoint to download a YouTube video in specified format.
-    
-    Expected JSON input:
-    {
-        "youtube_url": "https://www.youtube.com/watch?v=...",
-        "itag": 22  // Format itag
-    }
-    """
-    try:
-        data = request.json
-        youtube_url = data.get('youtube_url')
-        itag = data.get('itag')
-        
-        if not youtube_url:
-            return jsonify({
-                "error": "YouTube URL is required"
-            }), 400
-        
-        if not itag:
-            return jsonify({
-                "error": "Format itag is required"
-            }), 400
-        
-        if not is_valid_youtube_url(youtube_url):
-            return jsonify({
-                "error": "Invalid YouTube URL"
-            }), 400
-        
-        # Download the video
-        print(f"Downloading video: {youtube_url} with format {itag}")
-        try:
-            from utils.youtube import download_video_by_itag
-            download_info = download_video_by_itag(youtube_url, itag)
-            print(f"Video downloaded: {download_info['file_path']}")
-        except Exception as e:
-            print(f"Error downloading video: {str(e)}")
-            traceback.print_exc()
-            return jsonify({"error": f"Failed to download video: {str(e)}"}), 500
-        
-        # Create a download URL
-        download_path = download_info['file_path']
-        filename = os.path.basename(download_path)
-        
-        # Return the file path for the client to download
-        return jsonify({
-            "download_url": f"/download/{filename}",
-            "filename": filename
-        })
-    
-    except Exception as e:
-        print(f"Unexpected error: {str(e)}")
-        traceback.print_exc()
-        return jsonify({
-            "error": str(e)
-        }), 500
-
-@app.route('/download/<filename>', methods=['GET'])
-def serve_download(filename):
-    """Serve the downloaded file."""
-    try:
-        # First try direct path
-        file_path = os.path.join(TEMP_DIRECTORY, filename)
-        
-        # If file is not found at direct path, search recursively in TEMP_DIRECTORY
-        if not os.path.exists(file_path):
-            print(f"File not found at {file_path}, searching recursively...")
-            found = False
+        if video_id:
+            # Delete specific files for this video ID
+            patterns = [
+                f"{video_id}*",  # Any file starting with the video ID
+                f"*{video_id}*",  # Any file containing the video ID
+                f"{video_id}_transcript.txt",
+                f"{video_id}_summary.txt",
+                f"{video_id}_chunk_*.mp3"
+            ]
+            
+            for pattern in patterns:
+                matching_files = [f for f in os.listdir(TEMP_DIRECTORY) 
+                                  if fnmatch.fnmatch(f, pattern)]
+                
+                for filename in matching_files:
+                    file_path = os.path.join(TEMP_DIRECTORY, filename)
+                    if os.path.isfile(file_path):
+                        os.remove(file_path)
+                        files_deleted += 1
+                        print(f"Deleted: {file_path}")
+        else:
+            # Cleanup all temp files older than 1 hour
+            current_time = time.time()
+            one_hour_ago = current_time - (60 * 60)  # 1 hour in seconds
             
             for root, dirs, files in os.walk(TEMP_DIRECTORY):
-                if filename in files:
+                for filename in files:
                     file_path = os.path.join(root, filename)
-                    found = True
-                    print(f"Found file at: {file_path}")
-                    break
-            
-            if not found:
-                print(f"File not found anywhere in {TEMP_DIRECTORY}")
-                return jsonify({
-                    "error": "File not found"
-                }), 404
+                    try:
+                        file_modified_time = os.path.getmtime(file_path)
+                        if file_modified_time < one_hour_ago:
+                            os.remove(file_path)
+                            files_deleted += 1
+                            print(f"Deleted old file: {file_path}")
+                    except Exception as e:
+                        print(f"Error checking/removing file {file_path}: {str(e)}")
         
-        return send_file(
-            file_path,
-            as_attachment=True,
-            download_name=filename,
-            mimetype='application/octet-stream'
-        )
-    
+        return files_deleted
     except Exception as e:
-        print(f"Error serving file: {str(e)}")
-        traceback.print_exc()
-        return jsonify({
-            "error": str(e)
-        }), 500
+        print(f"Error during cleanup: {str(e)}")
+        return 0
 
 @app.route('/process', methods=['POST'])
 def process_video():
@@ -542,18 +359,24 @@ def process_video():
             
             # Save transcript to database if user is logged in
             if current_user.is_authenticated:
-                db.save_transcript(video_id, current_user.id, title, transcript_text)
+                db.save_transcript(current_user.id, video_id, title, transcript_text)
+            else:
+                # For non-logged in users, save to a temporary file
+                transcript_path = os.path.join(TEMP_DIRECTORY, f"{video_id}_transcript.txt")
+                with open(transcript_path, 'w', encoding='utf-8') as f:
+                    f.write(transcript_text)
             
-            # Store in session for non-logged in users
-            session['transcript'] = transcript_text
+            # Store only video metadata in session, not the full content
             session['video_id'] = video_id
             session['video_title'] = title
+            
+            # Clean up other temporary files related to this video (like audio files)
+            cleanup_temp_files(video_id)
         else:
             # Increment access count for existing transcript
             db.increment_transcript_access(video_id)
             
-            # Store transcript from database in session
-            session['transcript'] = transcript['content']
+            # Store metadata in session
             session['video_id'] = video_id
             session['video_title'] = transcript['title']
         
@@ -562,71 +385,131 @@ def process_video():
         flash(f'Error processing video: {str(e)}', 'danger')
         return redirect(url_for('index'))
 
-@app.route('/summary', methods=['POST'])
-def generate_summary():
-    if 'transcript' not in session or not session['transcript']:
-        flash('No transcript found. Please process a video first.', 'danger')
+@app.route('/transcript')
+def show_transcript():
+    if 'video_id' not in session:
+        flash('No video found. Please process a video first.', 'danger')
         return redirect(url_for('index'))
     
     video_id = session.get('video_id')
     video_title = session.get('video_title')
-    transcript = session.get('transcript')
+    
+    # Get transcript content
+    transcript_text = None
+    
+    # Try to get transcript from database first
+    if current_user.is_authenticated:
+        transcript = db.get_transcript(video_id)
+        if transcript:
+            transcript_text = transcript['content']
+    
+    # If not in database, try to load from temp file
+    if not transcript_text:
+        transcript_path = os.path.join(TEMP_DIRECTORY, f"{video_id}_transcript.txt")
+        if os.path.exists(transcript_path):
+            with open(transcript_path, 'r', encoding='utf-8') as f:
+                transcript_text = f.read()
+    
+    if not transcript_text:
+        flash('Transcript not found. Please process the video again.', 'danger')
+        return redirect(url_for('index'))
+    
+    return render_template('transcript.html', 
+                          transcript=transcript_text, 
+                          video_id=video_id,
+                          video_title=video_title)
+
+@app.route('/summary', methods=['POST'])
+def generate_summary():
+    if 'video_id' not in session:
+        flash('No video found. Please process a video first.', 'danger')
+        return redirect(url_for('index'))
+    
+    video_id = session.get('video_id')
+    video_title = session.get('video_title')
     
     try:
+        # Get transcript content first
+        transcript_text = None
+        
+        # Try to get transcript from database
+        if current_user.is_authenticated:
+            transcript = db.get_transcript(video_id)
+            if transcript:
+                transcript_text = transcript['content']
+        
+        # If not in database, try to load from temp file
+        if not transcript_text:
+            transcript_path = os.path.join(TEMP_DIRECTORY, f"{video_id}_transcript.txt")
+            if os.path.exists(transcript_path):
+                with open(transcript_path, 'r', encoding='utf-8') as f:
+                    transcript_text = f.read()
+        
+        if not transcript_text:
+            flash('Transcript not found. Please process the video again.', 'danger')
+            return redirect(url_for('index'))
+        
         # Check if summary already exists for logged in users
         summary = None
-        if current_user.is_authenticated and video_id:
+        if current_user.is_authenticated:
             summary = db.get_summary(video_id)
         
         if not summary:
             # Generate summary using OpenAI
-            summary_text = utils.generate_summary(transcript)
+            from utils.summarization import generate_summary as generate_summary_func
+            summary_text = generate_summary_func(transcript_text)
             
             # Save summary to database if user is logged in
-            if current_user.is_authenticated and video_id:
-                db.save_summary(video_id, current_user.id, video_title, summary_text)
+            if current_user.is_authenticated:
+                db.save_summary(current_user.id, video_id, video_title, summary_text)
+            else:
+                # For non-logged in users, save to a temporary file
+                summary_path = os.path.join(TEMP_DIRECTORY, f"{video_id}_summary.txt")
+                with open(summary_path, 'w', encoding='utf-8') as f:
+                    f.write(summary_text)
             
-            # Store in session for non-logged in users
-            session['summary'] = summary_text
+            # Clean up any intermediate files (not transcript/summary)
+            cleanup_temp_files(video_id)
         else:
             # Increment access count for existing summary
             db.increment_summary_access(video_id)
-            
-            # Store summary from database in session
-            session['summary'] = summary['content']
         
         return redirect(url_for('show_summary'))
     except Exception as e:
         flash(f'Error generating summary: {str(e)}', 'danger')
         return redirect(url_for('show_transcript'))
 
-@app.route('/transcript')
-def show_transcript():
-    if 'transcript' not in session or not session['transcript']:
-        flash('No transcript found. Please process a video first.', 'danger')
-        return redirect(url_for('index'))
-    
-    video_id = session.get('video_id')
-    video_title = session.get('video_title')
-    transcript = session.get('transcript')
-    
-    return render_template('transcript.html', 
-                          transcript=transcript, 
-                          video_id=video_id,
-                          video_title=video_title)
-
 @app.route('/summary')
 def show_summary():
-    if 'summary' not in session or not session['summary']:
-        flash('No summary found. Please generate a summary first.', 'danger')
+    if 'video_id' not in session:
+        flash('No video found. Please process a video first.', 'danger')
         return redirect(url_for('index'))
     
     video_id = session.get('video_id')
     video_title = session.get('video_title')
-    summary = session.get('summary')
+    
+    # Get summary content
+    summary_text = None
+    
+    # Try to get summary from database first
+    if current_user.is_authenticated:
+        summary = db.get_summary(video_id)
+        if summary:
+            summary_text = summary['content']
+    
+    # If not in database, try to load from temp file
+    if not summary_text:
+        summary_path = os.path.join(TEMP_DIRECTORY, f"{video_id}_summary.txt")
+        if os.path.exists(summary_path):
+            with open(summary_path, 'r', encoding='utf-8') as f:
+                summary_text = f.read()
+    
+    if not summary_text:
+        flash('Summary not found. Please generate a summary first.', 'danger')
+        return redirect(url_for('index'))
     
     return render_template('summary.html', 
-                          summary=summary, 
+                          summary=summary_text, 
                           video_id=video_id,
                           video_title=video_title)
 
@@ -676,6 +559,243 @@ def view_summary(video_id):
                           summary=summary['content'], 
                           video_id=video_id,
                           video_title=summary['title'])
+
+@app.route('/api/cleanup', methods=['POST'])
+@token_required
+def cleanup_files():
+    """API endpoint to clean up temporary files."""
+    try:
+        # Clean up the temp directory
+        deleted_count = cleanup_temp_files()
+        
+        # If no files were deleted, try the full cleanup
+        if deleted_count == 0:
+            if os.path.exists(TEMP_DIRECTORY):
+                shutil.rmtree(TEMP_DIRECTORY)
+                os.makedirs(TEMP_DIRECTORY, exist_ok=True)
+                return jsonify({
+                    "message": "Full temporary directory cleanup completed"
+                })
+        else:
+            return jsonify({
+                "message": f"Cleaned up {deleted_count} temporary files"
+            })
+        
+        return jsonify({
+            "message": "No temporary files needed cleaning"
+        })
+    
+    except Exception as e:
+        return jsonify({
+            "error": str(e)
+        }), 500
+
+@app.before_request
+def cleanup_old_files():
+    """Run periodic cleanup before some requests."""
+    # Only run cleanup occasionally (1% of requests) to avoid performance impact
+    if random.random() < 0.01:  # 1% chance
+        cleanup_temp_files()
+
+# API Authentication Endpoints
+@app.route('/api/auth/login', methods=['POST'])
+def api_login():
+    """API endpoint for user login and token generation."""
+    try:
+        data = request.json
+        email = data.get('email')
+        password = data.get('password')
+        
+        if not email or not password:
+            return jsonify({
+                "error": "Email and password are required"
+            }), 400
+        
+        # Validate credentials
+        user, error = login_user_with_credentials(email, password)
+        
+        if error:
+            return jsonify({
+                "error": error
+            }), 401
+        
+        # Generate token
+        token = generate_token(user.id)
+        
+        # Update last login time
+        db.update_last_login(user.id)
+        
+        return jsonify({
+            "message": "Login successful",
+            "token": token,
+            "user": {
+                "id": user.id,
+                "username": user.username,
+                "email": user.email
+            }
+        })
+    except Exception as e:
+        return jsonify({
+            "error": str(e)
+        }), 500
+
+@app.route('/api/auth/register', methods=['POST'])
+def api_register():
+    """API endpoint for user registration and token generation."""
+    try:
+        data = request.json
+        username = data.get('username')
+        email = data.get('email')
+        password = data.get('password')
+        
+        if not username or not email or not password:
+            return jsonify({
+                "error": "Username, email, and password are required"
+            }), 400
+        
+        # Register the user
+        user_id, error = register_user(username, email, password)
+        
+        if error:
+            return jsonify({
+                "error": error
+            }), 400
+        
+        # Generate token
+        token = generate_token(user_id)
+        
+        # Get user object
+        user = User.get(user_id)
+        
+        return jsonify({
+            "message": "Registration successful",
+            "token": token,
+            "user": {
+                "id": user.id,
+                "username": user.username,
+                "email": user.email
+            }
+        })
+    except Exception as e:
+        return jsonify({
+            "error": str(e)
+        }), 500
+
+@app.route('/api/auth/verify', methods=['GET'])
+@token_required
+def api_verify_token():
+    """API endpoint to verify token validity."""
+    return jsonify({
+        "message": "Token is valid",
+        "user": {
+            "id": request.user.id,
+            "username": request.user.username,
+            "email": request.user.email
+        }
+    })
+
+# API endpoint for transcript fetching
+@app.route('/api/transcript/<video_id>', methods=['GET'])
+@token_required
+def api_get_transcript(video_id):
+    """API endpoint to get a transcript by video ID."""
+    try:
+        # Get transcript from database
+        transcript = db.get_transcript(video_id)
+        
+        if not transcript:
+            return jsonify({
+                "error": "Transcript not found"
+            }), 404
+        
+        # Increment access count
+        db.increment_transcript_access(video_id, request.user.id)
+        
+        return jsonify({
+            "video_id": video_id,
+            "title": transcript['title'],
+            "transcript": transcript['content'],
+            "created_at": transcript['created_at'].isoformat() if hasattr(transcript['created_at'], 'isoformat') else str(transcript['created_at']),
+            "access_count": transcript['access_count']
+        })
+    except Exception as e:
+        return jsonify({
+            "error": str(e)
+        }), 500
+
+# API endpoint for summary fetching
+@app.route('/api/summary/<video_id>', methods=['GET'])
+@token_required
+def api_get_summary(video_id):
+    """API endpoint to get a summary by video ID."""
+    try:
+        # Get summary from database
+        summary = db.get_summary(video_id)
+        
+        if not summary:
+            return jsonify({
+                "error": "Summary not found"
+            }), 404
+        
+        # Increment access count
+        db.increment_summary_access(video_id, request.user.id)
+        
+        return jsonify({
+            "video_id": video_id,
+            "title": summary['title'],
+            "summary": summary['content'],
+            "created_at": summary['created_at'].isoformat() if hasattr(summary['created_at'], 'isoformat') else str(summary['created_at']),
+            "access_count": summary['access_count']
+        })
+    except Exception as e:
+        return jsonify({
+            "error": str(e)
+        }), 500
+
+# API endpoint for user's dashboard data
+@app.route('/api/dashboard', methods=['GET'])
+@token_required
+def api_dashboard():
+    """API endpoint to get user's transcripts and summaries."""
+    try:
+        user_id = request.user.id
+        
+        # Get user's transcripts and summaries
+        limit = int(request.args.get('limit', 10))
+        skip = int(request.args.get('skip', 0))
+        
+        transcripts = db.get_user_transcripts(user_id, limit, skip)
+        summaries = db.get_user_summaries(user_id, limit, skip)
+        
+        # Format the response
+        formatted_transcripts = []
+        for t in transcripts:
+            formatted_transcripts.append({
+                "id": str(t["_id"]),
+                "video_id": t["video_id"],
+                "title": t["title"],
+                "created_at": t["created_at"].isoformat() if hasattr(t["created_at"], 'isoformat') else str(t["created_at"]),
+                "access_count": t["access_count"]
+            })
+        
+        formatted_summaries = []
+        for s in summaries:
+            formatted_summaries.append({
+                "id": str(s["_id"]),
+                "video_id": s["video_id"],
+                "title": s["title"],
+                "created_at": s["created_at"].isoformat() if hasattr(s["created_at"], 'isoformat') else str(s["created_at"]),
+                "access_count": s["access_count"]
+            })
+        
+        return jsonify({
+            "transcripts": formatted_transcripts,
+            "summaries": formatted_summaries
+        })
+    except Exception as e:
+        return jsonify({
+            "error": str(e)
+        }), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5001)
