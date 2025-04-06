@@ -846,10 +846,10 @@ def cleanup_files(user_id):
                 return jsonify({
                         "message": "Full temporary directory cleanup completed"
                     })
-        else:
-            return jsonify({
-                "message": f"Cleaned up {deleted_count} temporary files"
-            })
+            else:
+                return jsonify({
+                    "message": f"Cleaned up {deleted_count} temporary files"
+                })
         
         return jsonify({
             "message": "No temporary files needed cleaning"
@@ -875,6 +875,11 @@ def after_request(response):
     response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
     response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
     return response
+
+@app.route('/ads.txt')
+def ads_txt():
+    """Serve ads.txt file from the root URL."""
+    return 'google.com, pub-8021347991590495, DIRECT, f08c47fec0942fa0'
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5001) 

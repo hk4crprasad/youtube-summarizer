@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google-adsense-account" content="ca-pub-8021347991590495">
     <title>Login - YouTube Summarizer</title>
     <link rel="icon" href="{{ url_for('static', filename='yt.svg') }}" type="image/svg+xml">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -10,6 +11,12 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <script src="{{ url_for('static', filename='auth.js') }}"></script>
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8021347991590495"
+     crossorigin="anonymous"></script>
+    
+    <script async custom-element="amp-auto-ads"
+        src="https://cdn.ampproject.org/v0/amp-auto-ads-0.1.js">
+    </script>
     <style>
         :root {
             --primary-color: #ff4757;
@@ -131,6 +138,9 @@
     </style>
 </head>
 <body>
+    <amp-auto-ads type="adsense"
+        data-ad-client="ca-pub-8021347991590495">
+    </amp-auto-ads>
     <div class="theme-toggle" id="theme-toggle">
         <i class="fas fa-moon"></i>
     </div>
@@ -178,6 +188,19 @@
                 <p class="mb-0 mt-2"><a href="{{ url_for('index') }}" class="signup-link">Back to Home</a></p>
             </div>
         </div>
+    </div>
+
+    <!-- Ad container below login form -->
+    <div class="container my-4 ad-container">
+        <ins class="adsbygoogle"
+            style="display:block"
+            data-ad-client="ca-pub-8021347991590495"
+            data-ad-slot="login-bottom"
+            data-ad-format="auto"
+            data-full-width-responsive="true"></ins>
+        <script>
+            (adsbygoogle = window.adsbygoogle || []).push({});
+        </script>
     </div>
 
     <script>

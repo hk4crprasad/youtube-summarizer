@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google-adsense-account" content="ca-pub-8021347991590495">
     <title>Transcript - YouTube Summarizer</title>
     <link rel="icon" href="{{ url_for('static', filename='yt.svg') }}" type="image/svg+xml">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -10,8 +11,17 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <script src="{{ url_for('static', filename='auth.js') }}"></script>
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8021347991590495"
+     crossorigin="anonymous"></script>
+    
+    <script async custom-element="amp-auto-ads"
+        src="https://cdn.ampproject.org/v0/amp-auto-ads-0.1.js">
+    </script>
 </head>
 <body>
+    <amp-auto-ads type="adsense"
+        data-ad-client="ca-pub-8021347991590495">
+    </amp-auto-ads>
     <nav class="navbar navbar-expand-lg sticky-top">
         <div class="container">
             <a class="navbar-brand" href="{{ url_for('index') }}">
@@ -44,6 +54,23 @@
             </div>
         </div>
     </nav>
+
+    <!-- Ad container below navigation -->
+    <div class="container my-3 ad-container">
+        <div class="row justify-content-center">
+            <div class="col-md-10 text-center">
+                <ins class="adsbygoogle"
+                    style="display:block"
+                    data-ad-client="ca-pub-8021347991590495"
+                    data-ad-slot="transcript-top"
+                    data-ad-format="auto"
+                    data-full-width-responsive="true"></ins>
+                <script>
+                    (adsbygoogle = window.adsbygoogle || []).push({});
+                </script>
+            </div>
+        </div>
+    </div>
 
     <div class="container my-5">
         <div class="row mb-4">
@@ -91,6 +118,19 @@
                 <div class="transcript-container">
                     <h2>Full Transcript</h2>
                     <pre id="transcript-text" class="transcript">{{ transcript }}</pre>
+                </div>
+                
+                <!-- Ad container at the bottom of transcript content -->
+                <div class="ad-container mt-5">
+                    <ins class="adsbygoogle"
+                        style="display:block"
+                        data-ad-client="ca-pub-8021347991590495"
+                        data-ad-slot="transcript-bottom"
+                        data-ad-format="auto"
+                        data-full-width-responsive="true"></ins>
+                    <script>
+                        (adsbygoogle = window.adsbygoogle || []).push({});
+                    </script>
                 </div>
             </div>
         </div>
