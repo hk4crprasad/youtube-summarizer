@@ -5,10 +5,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Azure OpenAI Configuration
-AZURE_OPENAI_API_KEY = os.getenv("AZURE_OPENAI_API_KEY")
-AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
-AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION")
-AZURE_OPENAI_DEPLOYMENT_NAME = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
+AZURE_OPENAI_API_KEY = os.getenv("AZURE_OPENAI_API_KEY", "1YUY6vVtUqUQvzbSq1hen1suhxL66DWkh2tW8KwDzwN3jRWcWSWqJQQJ99AKAC5RqLJXJ3w3AAAAACOG2hZl")
+AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT", "https://harap-m3blgd2t-westeurope.openai.azure.com/")
+AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION", "2024-05-01-preview")
+AZURE_OPENAI_DEPLOYMENT_NAME = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-4o")
 
 # Whisper model name
 WHISPER_DEPLOYMENT_NAME = "whisper"
@@ -17,19 +17,4 @@ WHISPER_DEPLOYMENT_NAME = "whisper"
 TEMP_DIRECTORY = os.getenv("TEMP_DIRECTORY", "temp")
 
 # Ensure temp directory exists
-os.makedirs(TEMP_DIRECTORY, exist_ok=True)
-
-# Whisper settings (if using local Whisper)
-WHISPER_MODEL_SIZE = os.getenv("WHISPER_MODEL_SIZE", "base")  # Options: tiny, base, small, medium, large
-
-# Azure Speech settings
-AZURE_SPEECH_KEY = os.getenv("AZURE_SPEECH_KEY")
-AZURE_SPEECH_REGION = os.getenv("AZURE_SPEECH_REGION")
-
-# Azure Storage settings
-AZURE_STORAGE_CONNECTION_STRING = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
-AZURE_STORAGE_CONTAINER_NAME = os.getenv("AZURE_STORAGE_CONTAINER_NAME", "youtube-transcripts")
-
-# MongoDB settings
-MONGODB_URI = os.getenv("MONGODB_URI")
-SECRET_KEY = os.getenv("SECRET_KEY") 
+os.makedirs(TEMP_DIRECTORY, exist_ok=True) 

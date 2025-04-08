@@ -8,15 +8,3 @@ azure-storage-blob
 ffmpeg-python
 moviepy
 pytubefix
-pymongo
-flask-login
-bcrypt
-flask-wtf
-dnspython
-Werkzeug
-PyJWT
-Jinja2
-itsdangerous
-markupsafe
-yt-dlp
-flask-cors
