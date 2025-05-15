@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IP Logs - YouTube Video Summarizer</title>
+    <link rel="icon" href="{{ url_for('static', filename='yt.svg') }}" type="image/svg+xml">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.7.1/dist/leaflet.css">
+    <style>
+        :root {
+            /* Light Theme Colors */
+            --primary-color: #ff4757;
+            --secondary-color: #2e86de;
+            --dark-color: #2f3542;
+            --light-color: #f5f6fa;
+            --success-color: #4cd137;
+            --warning-color: #ffa502;
+            --danger-color: #e84118;
+            --card-bg: #ffffff;
+            --body-bg: #f5f6fa;
+            --text-color: #333333;
+            --text-muted: #6c757d;
+            --border-color: #e0e0e0;
+            --code-bg: #f8f9fa;
+            --quote-bg: #f9f9f9;
+            --quote-border: #e9ecef;
+            --transition-speed: 0.3s;
+            --border-radius: 8px;
+            --box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Dark Mode Colors */
+        [data-theme="dark"] {
+            --primary-color: #ff6b81;
+            --secondary-color: #54a0ff;
+            --dark-color: #1e272e;
+            --light-color: #d2dae2;
+            --card-bg: #2a303c;
+            --body-bg: #1a1d24;
+            --text-color: #e2e8f0;
+            --text-muted: #9ca3af;
+            --border-color: #3f4756;
+            --code-bg: #2d333b;
+            --quote-bg: #2c3e50;
+            --quote-border: #3742fa;
+            --box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+        
+        body {
+            background-color: var(--body-bg);
+            color: var(--text-color);
+            font-family: 'Poppins', sans-serif;
+            transition: all var(--transition-speed) ease;
+            line-height: 1.6;
+            padding-bottom: 60px;
+        }
+        
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100%;
+            width: 250px;
+            background-color: var(--card-bg);
+            box-shadow: var(--box-shadow);
+            z-index: 1000;
+            transition: all var(--transition-speed) ease;
+            padding-top: 20px;
+        }
+        
+        .sidebar-header {
+            padding: 0 20px 20px;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 20px;
+        }
+        
+        .sidebar-brand {
+            color: var(--primary-color);
+            font-weight: 700;
+            font-size: 1.4rem;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .sidebar-brand:hover {
+            color: var(--primary-color);
+            opacity: 0.9;
+        }
+        
+        .sidebar-menu {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .sidebar-item {
+            margin-bottom: 5px;
+        }
+        
+        .sidebar-link {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 20px;
+            color: var(--text-color);
+            text-decoration: none;
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+        }
+        
+        .sidebar-link:hover, .sidebar-link.active {
+            background-color: rgba(0,0,0,0.05);
+            color: var(--primary-color);
+            border-left-color: var(--primary-color);
+        }
+        
+        [data-theme="dark"] .sidebar-link:hover, [data-theme="dark"] .sidebar-link.active {
+            background-color: rgba(255,255,255,0.05);
+        }
+        
+        .main-content {
+            margin-left: 250px;
+            padding: 20px;
+            transition: all var(--transition-speed) ease;
+        }
+        
+        .toggle-sidebar {
+            display: none;
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            z-index: 1001;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: var(--box-shadow);
+        }
+        
+        .card {
+            background-color: var(--card-bg);
+            border: none;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            margin-bottom: 20px;
+            transition: all var(--transition-speed) ease;
+        }
+        
+        .card-header {
+            background-color: transparent;
+            border-bottom: 1px solid var(--border-color);
+            padding: 15px 20px;
+            font-weight: 600;
+        }
+        
+        .card-body {
+            padding: 20px;
+        }
+        
+        .theme-switch {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            color: var(--text-color);
+        }
+        
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+            margin-left: 8px;
+        }
+        
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--text-muted);
+            transition: .4s;
+            border-radius: 24px;
+        }
+        
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .slider {
+            background-color: var(--primary-color);
+        }
+        
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+        
+        .ip-logs table {
+            border-collapse: separate;
+            border-spacing: 0;
+            width: 100%;
+        }
+        
+        .ip-logs th {
+            background-color: var(--code-bg);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        
+        .ip-logs th, .ip-logs td {
+            padding: 12px 15px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .ip-logs tbody tr {
+            transition: all 0.2s;
+        }
+        
+        .ip-logs tbody tr:hover {
+            background-color: var(--quote-bg);
+        }
+        
+        .flag-icon {
+            width: 24px;
+            margin-right: 8px;
+            border-radius: 3px;
+        }
+        
+        .btn-primary {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+        
+        .btn-primary:hover {
+            background-color: var(--danger-color);
+            border-color: var(--danger-color);
+        }
+        
+        .filter-section {
+            background-color: var(--card-bg);
+            border-radius: 8px;
+            margin-bottom: 20px;
+            padding: 15px;
+            box-shadow: var(--box-shadow);
+        }
+        
+        .filter-section .form-control, .filter-section .form-select {
+            background-color: var(--body-bg);
+            color: var(--text-color);
+            border-color: var(--border-color);
+        }
+        
+        .filter-section .form-control:focus, .filter-section .form-select:focus {
+            border-color: var(--primary-color);
+            box-shadow: none;
+        }
+        
+        .pagination {
+            justify-content: center;
+            margin-top: 20px;
+        }
+        
+        .pagination .page-link {
+            color: var(--primary-color);
+            background-color: var(--card-bg);
+            border-color: var(--border-color);
+        }
+        
+        .pagination .page-item.active .page-link {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+            color: white;
+        }
+        
+        .details-row {
+            display: none;
+            background-color: var(--quote-bg);
+        }
+        
+        .details-content {
+            padding: 15px;
+        }
+        
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+            
+            .sidebar.show {
+                transform: translateX(0);
+            }
+            
+            .main-content {
+                margin-left: 0;
+            }
+            
+            .toggle-sidebar {
+                display: flex;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="theme-switch">
+        <label for="theme-toggle"><i class="fas fa-moon"></i></label>
+        <label class="switch">
+            <input type="checkbox" id="theme-toggle">
+            <span class="slider"></span>
+        </label>
+    </div>
+    
+    <button class="toggle-sidebar" id="toggle-sidebar">
+        <i class="fas fa-bars"></i>
+    </button>
+    
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <a href="/admin/dashboard" class="sidebar-brand">
+                <i class="fa-brands fa-youtube" style="color: #e51f33;"></i>
+                <span>YT Summarizer</span>
+            </a>
+            <div class="text-muted small mt-2">Admin Dashboard</div>
+        </div>
+        
+        <ul class="sidebar-menu">
+            <li class="sidebar-item">
+                <a href="/admin/dashboard" class="sidebar-link">
+                    <i class="fas fa-tachometer-alt"></i>
+                    <span>Dashboard</span>
+                </a>
+            </li>
+            <li class="sidebar-item">
+                <a href="/admin/iplogs" class="sidebar-link active">
+                    <i class="fas fa-globe"></i>
+                    <span>IP Logs</span>
+                </a>
+            </li>
+            <li class="sidebar-item">
+                <a href="/admin/settings" class="sidebar-link">
+                    <i class="fas fa-cog"></i>
+                    <span>Settings</span>
+                </a>
+            </li>
+            <li class="sidebar-item">
+                <a href="/" class="sidebar-link">
+                    <i class="fas fa-home"></i>
+                    <span>Main Site</span>
+                </a>
+            </li>
+            <li class="sidebar-item">
+                <a href="/admin/logout" class="sidebar-link">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>Logout</span>
+                </a>
+            </li>
+        </ul>
+    </div>
+    
+    <div class="main-content">
+        <div class="container-fluid">
+            <div class="row mb-4">
+                <div class="col">
+                    <h1 class="fw-bold">IP Logs</h1>
+                    <p class="text-muted">Manage and analyze visitor IP logs</p>
+                </div>
+            </div>
+            
+            <div class="filter-section">
+                <form id="filter-form" method="GET">
+                    <div class="row align-items-end">
+                        <div class="col-md-2 mb-3">
+                            <label for="ip_address" class="form-label">IP Address</label>
+                            <input type="text" class="form-control" id="ip_address" name="ip_address" 
+                                value="{{ request.args.get('ip_address', '') }}">
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <label for="country" class="form-label">Country</label>
+                            <input type="text" class="form-control" id="country" name="country" 
+                                value="{{ request.args.get('country', '') }}">
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <label for="route" class="form-label">Route</label>
+                            <input type="text" class="form-control" id="route" name="route" 
+                                value="{{ request.args.get('route', '') }}">
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <label for="date" class="form-label">Date</label>
+                            <input type="date" class="form-control" id="date" name="date" 
+                                value="{{ request.args.get('date', '') }}">
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <label for="limit" class="form-label">Records per page</label>
+                            <select class="form-select" id="limit" name="limit">
+                                <option value="25" {% if request.args.get('limit') == '25' %}selected{% endif %}>25</option>
+                                <option value="50" {% if request.args.get('limit') == '50' %}selected{% endif %}>50</option>
+                                <option value="100" {% if request.args.get('limit') == '100' %}selected{% endif %}>100</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2 mb-3 d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-filter me-2"></i>Filter
+                            </button>
+                            <a href="/admin/iplogs" class="btn btn-outline-secondary">
+                                <i class="fas fa-times me-2"></i>Clear
+                            </a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="fas fa-list me-2"></i>IP Logs ({{ pagination.total_records }} records)</span>
+                    <div>
+                        <button class="btn btn-sm btn-outline-primary" id="export-csv">
+                            <i class="fas fa-download me-1"></i> Export CSV
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive ip-logs">
+                        <table class="table mb-0">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Time</th>
+                                    <th scope="col">IP Address</th>
+                                    <th scope="col">Location</th>
+                                    <th scope="col">Route</th>
+                                    <th scope="col">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for log in logs %}
+                                <tr data-log-id="{{ log.id }}">
+                                    <td>{{ log.timestamp }}</td>
+                                    <td>{{ log.ip_address }}</td>
+                                    <td>
+                                        {% if log.country %}
+                                            <img src="https://flagcdn.com/24x18/{{ log.country|lower }}.png" 
+                                                class="flag-icon" alt="{{ log.country }}">
+                                            {% if log.city %}{{ log.city }}, {% endif %}{{ log.country }}
+                                        {% else %}
+                                            <span class="text-muted">Unknown</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-primary">{{ log.route }}</span>
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-primary toggle-details" 
+                                            data-log-id="{{ log.id }}">
+                                            <i class="fas fa-info-circle"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                <tr class="details-row" id="details-{{ log.id }}">
+                                    <td colspan="5">
+                                        <div class="details-content">
+                                            <h6 class="fw-bold">Details:</h6>
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <p><strong>User Agent:</strong> {{ log.user_agent }}</p>
+                                                    <p><strong>Referrer:</strong> {{ log.referer }}</p>
+                                                    <p><strong>Organization:</strong> {{ log.org or 'Unknown' }}</p>
+                                                    {% if log.loc %}
+                                                    <p><strong>Coordinates:</strong> {{ log.loc }}</p>
+                                                    {% endif %}
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <p><strong>Region:</strong> {{ log.region or 'Unknown' }}</p>
+                                                    <p><strong>Postal:</strong> {{ log.postal or 'Unknown' }}</p>
+                                                    <p><strong>Timezone:</strong> {{ log.timezone or 'Unknown' }}</p>
+                                                    {% if log.headers %}
+                                                    <p><strong>Headers:</strong> <pre>{{ log.headers|tojson(indent=2) }}</pre></p>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Pagination -->
+            {% if pagination.total_pages > 1 %}
+            <nav aria-label="Page navigation">
+                <ul class="pagination">
+                    {% if pagination.current_page > 1 %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('admin_ip_logs', page=pagination.current_page-1, **request.args) }}" aria-label="Previous">
+                            <span aria-hidden="true">&laquo;</span>
+                        </a>
+                    </li>
+                    {% endif %}
+                    
+                    {% for page in range(max(1, pagination.current_page-2), min(pagination.total_pages+1, pagination.current_page+3)) %}
+                    <li class="page-item {% if page == pagination.current_page %}active{% endif %}">
+                        <a class="page-link" href="{{ url_for('admin_ip_logs', page=page, **request.args) }}">{{ page }}</a>
+                    </li>
+                    {% endfor %}
+                    
+                    {% if pagination.current_page < pagination.total_pages %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('admin_ip_logs', page=pagination.current_page+1, **request.args) }}" aria-label="Next">
+                            <span aria-hidden="true">&raquo;</span>
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Theme toggle functionality
+            const themeToggle = document.getElementById('theme-toggle');
+            
+            // Check for saved theme preference
+            if (localStorage.getItem('theme') === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                themeToggle.checked = true;
+            }
+            
+            // Handle theme toggle
+            themeToggle.addEventListener('change', function() {
+                if (this.checked) {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                    localStorage.setItem('theme', 'dark');
+                } else {
+                    document.documentElement.setAttribute('data-theme', 'light');
+                    localStorage.setItem('theme', 'light');
+                }
+            });
+            
+            // Sidebar toggle for mobile
+            const toggleSidebar = document.getElementById('toggle-sidebar');
+            const sidebar = document.getElementById('sidebar');
+            
+            toggleSidebar.addEventListener('click', function() {
+                sidebar.classList.toggle('show');
+            });
+            
+            // Toggle details rows
+            document.querySelectorAll('.toggle-details').forEach(button => {
+                button.addEventListener('click', function() {
+                    const logId = this.getAttribute('data-log-id');
+                    const detailsRow = document.getElementById(`details-${logId}`);
+                    
+                    if (detailsRow.style.display === 'table-row') {
+                        detailsRow.style.display = 'none';
+                        this.innerHTML = '<i class="fas fa-info-circle"></i>';
+                    } else {
+                        // Hide all other details rows
+                        document.querySelectorAll('.details-row').forEach(row => {
+                            row.style.display = 'none';
+                        });
+                        document.querySelectorAll('.toggle-details').forEach(btn => {
+                            btn.innerHTML = '<i class="fas fa-info-circle"></i>';
+                        });
+                        
+                        detailsRow.style.display = 'table-row';
+                        this.innerHTML = '<i class="fas fa-times-circle"></i>';
+                    }
+                });
+            });
+            
+            // Export to CSV functionality
+            document.getElementById('export-csv').addEventListener('click', function() {
+                window.location.href = `/admin/iplogs/export?${new URLSearchParams(window.location.search).toString()}`;
+            });
+        });
+    </script>
+</body>
+</html>

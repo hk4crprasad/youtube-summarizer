@@ -1,0 +1,203 @@
+{% extends "user_dashboard.html" %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h1 class="fw-bold">API Keys</h1>
+        <p class="text-muted">Manage your API keys for programmatic access to our services</p>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-plus me-2"></i>Create New API Key</span>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('create_api_key') }}" class="row g-3">
+                    <div class="col-md-6">
+                        <label for="key-name" class="form-label">Key Name</label>
+                        <input type="text" class="form-control" id="key-name" name="name" required 
+                               placeholder="e.g., Production App, Testing">
+                        <div class="form-text">Give your key a descriptive name to remember its purpose.</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="expiry-days" class="form-label">Expires In (Days)</label>
+                        <select class="form-select" id="expiry-days" name="expires_in_days">
+                            <option value="30">30 days</option>
+                            <option value="90">90 days</option>
+                            <option value="180">180 days</option>
+                            <option value="365">365 days</option>
+                        </select>
+                    </div>
+                    <div class="col-12 mt-3">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-key me-2"></i>Generate API Key
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-key me-2"></i>Your API Keys
+            </div>
+            <div class="card-body">
+                {% if api_keys %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Key</th>
+                                    <th>Created</th>
+                                    <th>Expires</th>
+                                    <th>Status</th>
+                                    <th>Usage</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for key in api_keys %}
+                                <tr>
+                                    <td>{{ key.name }}</td>
+                                    <td>
+                                        <code class="user-select-all">{{ key.key[:10] }}...{{ key.key[-6:] }}</code>
+                                        <i class="fas fa-copy ms-2 copy-btn" data-clipboard-text="{{ key.key }}"></i>
+                                    </td>
+                                    <td>{{ key.created_at.strftime('%Y-%m-%d') }}</td>
+                                    <td>{{ key.expires_at.strftime('%Y-%m-%d') }}</td>
+                                    <td>
+                                        <span class="badge bg-{{ 'success' if key.is_active else 'danger' }}">
+                                            {{ 'Active' if key.is_active else 'Inactive' }}
+                                        </span>
+                                    </td>
+                                    <td>{{ key.usage.total_requests }} requests</td>
+                                    <td>
+                                        <form method="POST" action="{{ url_for('revoke_api_key') }}" class="d-inline">
+                                            <input type="hidden" name="key_id" value="{{ key._id }}">
+                                            <button type="submit" class="btn btn-sm btn-danger" 
+                                                    {% if not key.is_active %}disabled{% endif %}
+                                                    onclick="return confirm('Are you sure you want to revoke this API key? This action cannot be undone.')">
+                                                <i class="fas fa-ban"></i> Revoke
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="empty-state">
+                        <div class="icon">
+                            <i class="fas fa-key"></i>
+                        </div>
+                        <h4>No API Keys Yet</h4>
+                        <p class="text-muted">You haven't created any API keys yet. Use the form above to create your first key.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-book me-2"></i>API Documentation
+            </div>
+            <div class="card-body">
+                <h5>Using Your API Key</h5>
+                <p>Your API key must be included in all API requests to our server in the <code>x-api-key</code> header.</p>
+                
+                <h5 class="mt-4">Endpoints</h5>
+                
+                <div class="api-endpoint-card mb-4">
+                    <h6><span class="badge bg-success me-2">POST</span> /v1/api/summarize</h6>
+                    <p>Summarize a YouTube video given its URL.</p>
+                    
+                    <div class="mt-3">
+                        <strong>Request Body:</strong>
+                        <pre class="bg-light p-3 rounded"><code>{
+  "youtube_url": "https://www.youtube.com/watch?v=...",
+  "chunk_duration": 600,  // Optional: chunk duration in seconds, default 600 (10 minutes)
+  "preferred_quality": "highest"  // Optional: audio quality (highest, medium, lowest)
+}</code></pre>
+                    </div>
+                    
+                    <div class="mt-3">
+                        <strong>Example Request:</strong>
+                        <pre class="bg-light p-3 rounded"><code>curl -X POST \
+  https://yourdomain.com/v1/api/summarize \
+  -H 'Content-Type: application/json' \
+  -H 'x-api-key: YOUR_API_KEY' \
+  -d '{
+    "youtube_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+  }'</code></pre>
+                    </div>
+                </div>
+                
+                <div class="api-endpoint-card mb-4">
+                    <h6><span class="badge bg-success me-2">POST</span> /v1/api/translate</h6>
+                    <p>Translate a transcript to a different language.</p>
+                    
+                    <div class="mt-3">
+                        <strong>Request Body:</strong>
+                        <pre class="bg-light p-3 rounded"><code>{
+  "transcript": "Text to translate",  // Can provide this directly
+  "video_id": "abc123",               // Optional: video ID for file naming
+  "target_language": "Spanish"        // Required: target language for translation
+}</code></pre>
+                    </div>
+                </div>
+                
+                <h5 class="mt-4">Rate Limits</h5>
+                <p>API requests are limited to 100 requests per hour per API key. If you exceed this limit, your requests will be rejected until the limit resets.</p>
+                
+                <h5 class="mt-4">Error Codes</h5>
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Status Code</th>
+                                <th>Error Code</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>400</td>
+                                <td>invalid_request</td>
+                                <td>The request was malformed or missing required parameters.</td>
+                            </tr>
+                            <tr>
+                                <td>401</td>
+                                <td>invalid_api_key</td>
+                                <td>The API key provided is invalid or has been revoked.</td>
+                            </tr>
+                            <tr>
+                                <td>403</td>
+                                <td>rate_limit_exceeded</td>
+                                <td>You have exceeded the rate limit for API requests.</td>
+                            </tr>
+                            <tr>
+                                <td>500</td>
+                                <td>server_error</td>
+                                <td>An unexpected error occurred on the server.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
