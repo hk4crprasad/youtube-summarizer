@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - YouTube Video Summarizer</title>
+    <link rel="icon" href="{{ url_for('static', filename='yt.svg') }}" type="image/svg+xml">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.7.1/dist/leaflet.css">
+    <style>
+        :root {
+            /* Light Theme Colors */
+            --primary-color: #ff4757;
+            --secondary-color: #2e86de;
+            --dark-color: #2f3542;
+            --light-color: #f5f6fa;
+            --success-color: #4cd137;
+            --warning-color: #ffa502;
+            --danger-color: #e84118;
+            --card-bg: #ffffff;
+            --body-bg: #f5f6fa;
+            --text-color: #333333;
+            --text-muted: #6c757d;
+            --border-color: #e0e0e0;
+            --code-bg: #f8f9fa;
+            --quote-bg: #f9f9f9;
+            --quote-border: #e9ecef;
+            --transition-speed: 0.3s;
+            --border-radius: 8px;
+            --box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Dark Mode Colors */
+        [data-theme="dark"] {
+            --primary-color: #ff6b81;
+            --secondary-color: #54a0ff;
+            --dark-color: #1e272e;
+            --light-color: #d2dae2;
+            --card-bg: #2a303c;
+            --body-bg: #1a1d24;
+            --text-color: #e2e8f0;
+            --text-muted: #9ca3af;
+            --border-color: #3f4756;
+            --code-bg: #2d333b;
+            --quote-bg: #2c3e50;
+            --quote-border: #3742fa;
+            --box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+        
+        body {
+            background-color: var(--body-bg);
+            color: var(--text-color);
+            font-family: 'Poppins', sans-serif;
+            transition: all var(--transition-speed) ease;
+            line-height: 1.6;
+            padding-bottom: 60px;
+        }
+        
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100%;
+            width: 250px;
+            background-color: var(--card-bg);
+            box-shadow: var(--box-shadow);
+            z-index: 1000;
+            transition: all var(--transition-speed) ease;
+            padding-top: 20px;
+        }
+        
+        .sidebar-header {
+            padding: 0 20px 20px;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 20px;
+        }
+        
+        .sidebar-brand {
+            color: var(--primary-color);
+            font-weight: 700;
+            font-size: 1.4rem;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .sidebar-brand:hover {
+            color: var(--primary-color);
+            opacity: 0.9;
+        }
+        
+        .sidebar-menu {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .sidebar-item {
+            margin-bottom: 5px;
+        }
+        
+        .sidebar-link {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 20px;
+            color: var(--text-color);
+            text-decoration: none;
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+        }
+        
+        .sidebar-link:hover, .sidebar-link.active {
+            background-color: rgba(0,0,0,0.05);
+            color: var(--primary-color);
+            border-left-color: var(--primary-color);
+        }
+        
+        [data-theme="dark"] .sidebar-link:hover, [data-theme="dark"] .sidebar-link.active {
+            background-color: rgba(255,255,255,0.05);
+        }
+        
+        .main-content {
+            margin-left: 250px;
+            padding: 20px;
+            transition: all var(--transition-speed) ease;
+        }
+        
+        .toggle-sidebar {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            z-index: 1001;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: var(--box-shadow);
+        }
+        
+        .card {
+            background-color: var(--card-bg);
+            border: none;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            margin-bottom: 20px;
+            transition: all var(--transition-speed) ease;
+        }
+        
+        .card-header {
+            background-color: transparent;
+            border-bottom: 1px solid var(--border-color);
+            padding: 15px 20px;
+            font-weight: 600;
+        }
+        
+        .card-body {
+            padding: 20px;
+        }
+        
+        .theme-switch {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            color: var(--text-color);
+        }
+        
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+            margin-left: 8px;
+        }
+        
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--text-muted);
+            transition: .4s;
+            border-radius: 24px;
+        }
+        
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .slider {
+            background-color: var(--primary-color);
+        }
+        
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+        
+        .stat-card {
+            border-radius: 10px;
+            padding: 20px;
+            transition: all 0.3s;
+            height: 100%;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .stat-card .icon {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+        
+        .stat-card .value {
+            font-size: 2rem;
+            font-weight: 700;
+        }
+        
+        .stat-card .label {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+        
+        .ip-logs table {
+            border-collapse: separate;
+            border-spacing: 0;
+            width: 100%;
+        }
+        
+        .ip-logs th {
+            background-color: var(--code-bg);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        
+        .ip-logs th, .ip-logs td {
+            padding: 12px 15px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .ip-logs tbody tr {
+            transition: all 0.2s;
+        }
+        
+        .ip-logs tbody tr:hover {
+            background-color: var(--quote-bg);
+        }
+        
+        .flag-icon {
+            width: 24px;
+            margin-right: 8px;
+            border-radius: 3px;
+        }
+        
+        .btn-primary {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+        
+        .btn-primary:hover {
+            background-color: var(--danger-color);
+            border-color: var(--danger-color);
+        }
+        
+        .filter-section {
+            background-color: var(--card-bg);
+            border-radius: 8px;
+            margin-bottom: 20px;
+            padding: 15px;
+            box-shadow: var(--box-shadow);
+        }
+        
+        .filter-section .form-control, .filter-section .form-select {
+            background-color: var(--body-bg);
+            color: var(--text-color);
+            border-color: var(--border-color);
+        }
+        
+        .filter-section .form-control:focus, .filter-section .form-select:focus {
+            border-color: var(--primary-color);
+            box-shadow: none;
+        }
+        
+        .pagination {
+            justify-content: center;
+            margin-top: 20px;
+        }
+        
+        .pagination .page-link {
+            color: var(--primary-color);
+            background-color: var(--card-bg);
+            border-color: var(--border-color);
+        }
+        
+        .pagination .page-item.active .page-link {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+            color: white;
+        }
+        
+        .map-container {
+            height: 400px;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .details-row {
+            display: none;
+            background-color: var(--quote-bg);
+        }
+        
+        .details-content {
+            padding: 15px;
+        }
+        
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+            
+            .sidebar.show {
+                transform: translateX(0);
+            }
+            
+            .main-content {
+                margin-left: 0;
+            }
+            
+            .toggle-sidebar {
+                display: flex;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="theme-switch">
+        <label for="theme-toggle"><i class="fas fa-moon"></i></label>
+        <label class="switch">
+            <input type="checkbox" id="theme-toggle">
+            <span class="slider"></span>
+        </label>
+    </div>
+    
+    <button class="toggle-sidebar" id="toggle-sidebar">
+        <i class="fas fa-bars"></i>
+    </button>
+    
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <a href="/admin/dashboard" class="sidebar-brand">
+                <i class="fa-brands fa-youtube" style="color: #e51f33;"></i>
+                <span>YT Summarizer</span>
+            </a>
+            <div class="text-muted small mt-2">Admin Dashboard</div>
+        </div>
+        
+        <ul class="sidebar-menu">
+            <li class="sidebar-item">
+                <a href="/admin/dashboard" class="sidebar-link active">
+                    <i class="fas fa-tachometer-alt"></i>
+                    <span>Dashboard</span>
+                </a>
+            </li>
+            <li class="sidebar-item">
+                <a href="/admin/iplogs" class="sidebar-link">
+                    <i class="fas fa-globe"></i>
+                    <span>IP Logs</span>
+                </a>
+            </li>
+            <li class="sidebar-item">
+                <a href="/admin/settings" class="sidebar-link">
+                    <i class="fas fa-cog"></i>
+                    <span>Settings</span>
+                </a>
+            </li>
+            <li class="sidebar-item">
+                <a href="/" class="sidebar-link">
+                    <i class="fas fa-home"></i>
+                    <span>Main Site</span>
+                </a>
+            </li>
+            <li class="sidebar-item">
+                <a href="/admin/logout" class="sidebar-link">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>Logout</span>
+                </a>
+            </li>
+        </ul>
+    </div>
+    
+    <div class="main-content">
+        <div class="container-fluid">
+            <div class="row mb-4">
+                <div class="col">
+                    <h1 class="fw-bold">Dashboard</h1>
+                    <p class="text-muted">IP Logs Overview and Statistics</p>
+                </div>
+            </div>
+            
+            <div class="row mb-4">
+                <div class="col-md-3 mb-3">
+                    <div class="card h-100">
+                        <div class="stat-card bg-primary text-white">
+                            <div class="icon">
+                                <i class="fas fa-chart-line"></i>
+                            </div>
+                            <div class="value">{{ stats.total_visits }}</div>
+                            <div class="label">Total Visits</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-3 mb-3">
+                    <div class="card h-100">
+                        <div class="stat-card bg-success text-white">
+                            <div class="icon">
+                                <i class="fas fa-users"></i>
+                            </div>
+                            <div class="value">{{ stats.unique_ips }}</div>
+                            <div class="label">Unique Visitors</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-3 mb-3">
+                    <div class="card h-100">
+                        <div class="stat-card bg-warning text-white">
+                            <div class="icon">
+                                <i class="fas fa-map-marker-alt"></i>
+                            </div>
+                            <div class="value">{{ stats.countries|length }}</div>
+                            <div class="label">Countries</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-3 mb-3">
+                    <div class="card h-100">
+                        <div class="stat-card bg-info text-white">
+                            <div class="icon">
+                                <i class="fas fa-link"></i>
+                            </div>
+                            <div class="value">{{ stats.routes|length }}</div>
+                            <div class="label">Routes</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row mb-4">
+                <div class="col-md-7">
+                    <div class="card map-container" id="world-map"></div>
+                </div>
+                
+                <div class="col-md-5">
+                    <div class="card">
+                        <div class="card-header">
+                            <i class="fas fa-globe me-2"></i>Top Countries
+                        </div>
+                        <div class="card-body p-0">
+                            <table class="table mb-0">
+                                <thead>
+                                    <tr>
+                                        <th scope="col">Country</th>
+                                        <th scope="col">Visits</th>
+                                        <th scope="col">Percentage</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for country in stats.top_countries %}
+                                    <tr>
+                                        <td>
+                                            {% if country.country %}
+                                                <img src="https://flagcdn.com/24x18/{{ country.country|lower }}.png" 
+                                                    class="flag-icon" alt="{{ country.country }}">
+                                                {{ country.country }}
+                                            {% else %}
+                                                <span class="text-muted">Unknown</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ country.count }}</td>
+                                        <td>
+                                            <div class="progress" style="height: 6px;">
+                                                <div class="progress-bar bg-primary" 
+                                                    style="width: {{ (country.count / stats.total_visits * 100)|round if stats.total_visits > 0 else 0 }}%;"></div>
+                                            </div>
+                                            <small class="text-muted">
+                                                {% if stats.total_visits > 0 %}{{ (country.count / stats.total_visits * 100)|round(1) }}{% else %}0{% endif %}%
+                                            </small>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row mb-4">
+                <div class="col-md-12">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <span><i class="fas fa-list me-2"></i>Recent IP Logs</span>
+                            <a href="/admin/iplogs" class="btn btn-sm btn-primary">View All</a>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive ip-logs">
+                                <table class="table mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th scope="col">Time</th>
+                                            <th scope="col">IP Address</th>
+                                            <th scope="col">Location</th>
+                                            <th scope="col">Route</th>
+                                            <th scope="col">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for log in logs %}
+                                        <tr data-log-id="{{ log.id }}">
+                                            <td>{{ log.timestamp }}</td>
+                                            <td>{{ log.ip_address }}</td>
+                                            <td>
+                                                {% if log.country %}
+                                                    <img src="https://flagcdn.com/24x18/{{ log.country|lower }}.png" 
+                                                        class="flag-icon" alt="{{ log.country }}">
+                                                    {% if log.city %}{{ log.city }}, {% endif %}{{ log.country }}
+                                                {% else %}
+                                                    <span class="text-muted">Unknown</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-primary">{{ log.route }}</span>
+                                            </td>
+                                            <td>
+                                                <button class="btn btn-sm btn-outline-primary toggle-details" 
+                                                    data-log-id="{{ log.id }}">
+                                                    <i class="fas fa-info-circle"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        <tr class="details-row" id="details-{{ log.id }}">
+                                            <td colspan="5">
+                                                <div class="details-content">
+                                                    <h6 class="fw-bold">Details:</h6>
+                                                    <div class="row">
+                                                        <div class="col-md-6">
+                                                            <p><strong>User Agent:</strong> {{ log.user_agent }}</p>
+                                                            <p><strong>Referrer:</strong> {{ log.referer }}</p>
+                                                            <p><strong>Organization:</strong> {{ log.org or 'Unknown' }}</p>
+                                                            {% if log.loc %}
+                                                            <p><strong>Coordinates:</strong> {{ log.loc }}</p>
+                                                            {% endif %}
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <p><strong>Region:</strong> {{ log.region or 'Unknown' }}</p>
+                                                            <p><strong>Postal:</strong> {{ log.postal or 'Unknown' }}</p>
+                                                            <p><strong>Timezone:</strong> {{ log.timezone or 'Unknown' }}</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Theme toggle functionality
+            const themeToggle = document.getElementById('theme-toggle');
+            
+            // Check for saved theme preference
+            if (localStorage.getItem('theme') === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                themeToggle.checked = true;
+            }
+            
+            // Handle theme toggle
+            themeToggle.addEventListener('change', function() {
+                if (this.checked) {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                    localStorage.setItem('theme', 'dark');
+                } else {
+                    document.documentElement.setAttribute('data-theme', 'light');
+                    localStorage.setItem('theme', 'light');
+                }
+            });
+            
+            // Sidebar toggle for mobile
+            const toggleSidebar = document.getElementById('toggle-sidebar');
+            const sidebar = document.getElementById('sidebar');
+            
+            toggleSidebar.addEventListener('click', function() {
+                sidebar.classList.toggle('show');
+            });
+            
+            // Toggle details rows
+            var toggleButtons = document.querySelectorAll('.toggle-details');
+            for (var i = 0; i < toggleButtons.length; i++) {
+                toggleButtons[i].addEventListener('click', function() {
+                    var logId = this.getAttribute('data-log-id');
+                    var detailsRow = document.getElementById('details-' + logId);
+                    
+                    if (detailsRow.style.display === 'table-row') {
+                        detailsRow.style.display = 'none';
+                        this.innerHTML = '<i class="fas fa-info-circle"></i>';
+                    } else {
+                        // Hide all other details rows
+                        var allRows = document.querySelectorAll('.details-row');
+                        for (var j = 0; j < allRows.length; j++) {
+                            allRows[j].style.display = 'none';
+                        }
+                        
+                        var allBtns = document.querySelectorAll('.toggle-details');
+                        for (var k = 0; k < allBtns.length; k++) {
+                            allBtns[k].innerHTML = '<i class="fas fa-info-circle"></i>';
+                        }
+                        
+                        detailsRow.style.display = 'table-row';
+                        this.innerHTML = '<i class="fas fa-times-circle"></i>';
+                    }
+                });
+            }
+            
+            // Initialize map if data is available
+            if (document.getElementById('world-map')) {
+                const map = L.map('world-map').setView([20, 0], 2);
+                
+                // Add OpenStreetMap tile layer
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                }).addTo(map);
+                
+                // Add markers for each location with coordinates
+                const locations = {{ map_data|safe }};
+                
+                locations.forEach(function(location) {
+                    if (location.lat && location.lng) {
+                        const marker = L.marker([location.lat, location.lng]).addTo(map);
+                        marker.bindPopup(
+                            '<b>' + location.ip + '</b><br>' +
+                            (location.city ? location.city + ', ' : '') + (location.country || 'Unknown') + '<br>' +
+                            '<small>' + location.count + ' visits</small>'
+                        );
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>

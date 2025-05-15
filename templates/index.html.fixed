@@ -1,0 +1,44 @@
+// Let's create the fixed tab listener
+// Add this to the tab switching code:
+
+// Setup tab switching event handlers
+document.addEventListener('DOMContentLoaded', function() {
+    // Check global scope for originalTranscript and currentVideoId variables
+    if (typeof originalTranscript === 'undefined') {
+        window.originalTranscript = '';
+    }
+    if (typeof currentVideoId === 'undefined') {
+        window.currentVideoId = '';
+    }
+    
+    // Listen for tab changes to preserve transcript state
+    const tabElements = document.querySelectorAll('[data-bs-toggle="tab"]');
+    tabElements.forEach(tab => {
+        tab.addEventListener('shown.bs.tab', function(event) {
+            console.log("Tab switched:", event.target.id);
+            
+            // If switching back to summarize tab, try to restore transcript data
+            if (event.target.id === 'summarize-tab') {
+                // If transcript is empty, try to get it from localStorage
+                if (!originalTranscript || originalTranscript.trim() === '') {
+                    const savedTranscript = localStorage.getItem('lastTranscript');
+                    const savedVideoId = localStorage.getItem('lastVideoId');
+                    
+                    if (savedTranscript && savedVideoId) {
+                        console.log("Restoring transcript from localStorage");
+                        originalTranscript = savedTranscript;
+                        currentVideoId = savedVideoId;
+                        
+                        // Update the UI if there's a video title already
+                        if (videoTitle && videoTitle.textContent) {
+                            if (transcriptContent) {
+                                transcriptContent.textContent = savedTranscript;
+                            }
+                            resultsSection.style.display = 'block';
+                        }
+                    }
+                }
+            }
+        });
+    });
+});

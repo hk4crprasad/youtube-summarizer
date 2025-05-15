@@ -1,0 +1,2474 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Video Summarizer</title>
+    <link rel="icon" href="{{ url_for('static', filename='yt.svg') }}" type="image/svg+xml">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+   <script
+  src="https://challenges.cloudflare.com/turnstile/v0/api.js"
+  onload="initTurnstile()"
+></script>
+    <style>
+        :root {
+            /* Light Theme Colors */
+            --primary-color: #ff4757;
+            --secondary-color: #2e86de;
+            --dark-color: #2f3542;
+            --light-color: #f5f6fa;
+            --success-color: #4cd137;
+            --warning-color: #ffa502;
+            --danger-color: #e84118;
+            --card-bg: #ffffff;
+            --body-bg: #f5f6fa;
+            --text-color: #333333;
+            --text-muted: #6c757d;
+            --border-color: #e0e0e0;
+            --code-bg: #f8f9fa;
+            --quote-bg: #f9f9f9;
+            --quote-border: #e9ecef;
+            --transition-speed: 0.3s;
+            --border-radius: 8px;
+            --box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            --content-max-width: 100ch;
+            --font-mono: 'Roboto Mono', monospace;
+            --accordion-bg: #f8f9fa;
+            --input-bg: #ffffff;
+            --btn-text: #ffffff;
+            --tab-active-bg: #ffffff;
+            --tab-active-text: #333333;
+            --tab-inactive-bg: #e9ecef;
+            --tab-inactive-text: #6c757d;
+        }
+
+        /* Dark Mode Colors - Enhanced for better contrast */
+        [data-theme="dark"] {
+            --primary-color: #ff6b81;
+            --secondary-color: #54a0ff;
+            --dark-color: #1e272e;
+            --light-color: #d2dae2;
+            --card-bg: #2a303c;
+            --body-bg: #1a1d24;
+            --text-color: #e2e8f0;
+            --text-muted: #9ca3af;
+            --border-color: #3f4756;
+            --code-bg: #2d333b;
+            --quote-bg: #2c3e50;
+            --quote-border: #3742fa;
+            --box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            --accordion-bg: #2d333b;
+            --input-bg: #3a404e;
+            --btn-text: #ffffff;
+            --tab-active-bg: #2a303c;
+            --tab-active-text: #e2e8f0;
+            --tab-inactive-bg: #1e272e;
+            --tab-inactive-text: #9ca3af;
+        }
+
+        body {
+            padding-top: 2rem;
+            background-color: var(--body-bg);
+            color: var(--text-color);
+            font-family: 'Poppins', sans-serif;
+            transition: all var(--transition-speed) ease;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 850px;
+        }
+
+        .card {
+            margin-bottom: 20px;
+            box-shadow: var(--box-shadow);
+            border-radius: var(--border-radius);
+            border: none;
+            overflow: hidden;
+            background-color: var(--card-bg);
+            transition: all var(--transition-speed) ease;
+        }
+
+        .card-header {
+            background-color: var(--primary-color);
+            color: white;
+            font-weight: 600;
+            padding: 14px 20px;
+            border-bottom: none;
+        }
+
+        .card-body {
+            padding: 20px;
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+            transition: all 0.2s ease;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--danger-color);
+            border-color: var(--danger-color);
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background-color: var(--secondary-color);
+            border-color: var(--secondary-color);
+            transition: all 0.2s ease;
+        }
+
+        .btn-secondary:hover {
+            opacity: 0.9;
+            transform: translateY(-2px);
+        }
+
+        #loading {
+            display: none;
+        }
+
+        .spinner-border {
+            width: 3rem;
+            height: 3rem;
+        }
+
+        .results {
+            display: none;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+
+        .url-input {
+            border-radius: var(--border-radius) 0 0 var(--border-radius);
+            padding: 12px;
+            border: 2px solid var(--border-color);
+            background-color: var(--card-bg);
+            color: var(--text-color);
+        }
+
+        .url-input:focus {
+            box-shadow: none;
+            border-color: var(--primary-color);
+            background-color: var(--card-bg);
+            color: var(--text-color);
+        }
+
+        .submit-btn {
+            border-radius: 0 var(--border-radius) var(--border-radius) 0;
+            padding: 12px 20px;
+            font-weight: 600;
+        }
+
+        .error-message {
+            color: var(--danger-color);
+            display: none;
+            margin-top: 10px;
+            font-weight: 500;
+            animation: shakeX 0.5s ease-in-out;
+        }
+
+        /* Language Selector Styling */
+        .language-selector {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            padding: 10px;
+            background-color: rgba(0,0,0,0.03);
+            border-radius: var(--border-radius);
+            flex-wrap: wrap;
+        }
+
+        [data-theme="dark"] .language-selector {
+            background-color: rgba(255,255,255,0.03);
+        }
+
+        .language-selector label {
+            margin-right: 10px;
+            font-weight: 500;
+        }
+
+        .language-selector select {
+            margin: 0 10px;
+            padding: 8px 12px;
+            border-radius: var(--border-radius);
+            border: 1px solid var(--border-color);
+            background-color: var(--card-bg);
+            color: var(--text-color);
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .language-selector select:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 2px rgba(255, 71, 87, 0.2);
+        }
+
+        #translation-loading {
+            display: none;
+            margin-left: 10px;
+        }
+
+        #translated-transcript {
+            display: none;
+        }
+
+        /* Theme Switch */
+        .theme-switch {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .theme-switch label {
+            margin: 0 10px 0 0;
+            cursor: pointer;
+            color: var(--text-color);
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 54px;
+            height: 28px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 28px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: var(--secondary-color);
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+
+        /* Accordion Styling */
+        .accordion-button {
+            background-color: var(--light-color);
+            color: var(--text-color);
+            font-weight: 500;
+            padding: 15px 20px;
+            border: none;
+            transition: all 0.3s ease;
+        }
+
+        .accordion-button:not(.collapsed) {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .accordion-button:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 0.25rem rgba(var(--primary-color), 0.25);
+        }
+
+        [data-theme="dark"] .accordion-button {
+            background-color: var(--dark-color);
+        }
+
+        /* Text Formatting Controls */
+        .text-controls {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+            flex-wrap: wrap;
+        }
+
+        .text-controls label {
+            margin-right: 10px;
+            font-weight: 500;
+        }
+
+        .text-btn {
+            padding: 6px 10px;
+            margin: 0 3px;
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            background-color: var(--card-bg);
+            color: var(--text-color);
+            transition: all 0.2s;
+            font-size: 0.85rem;
+        }
+
+        .text-btn:hover {
+            background-color: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        .text-btn.active {
+            background-color: var(--secondary-color);
+            color: white;
+            border-color: var(--secondary-color);
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes shakeX {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+            20%, 40%, 60%, 80% { transform: translateX(5px); }
+        }
+
+        /* Video Information Section */
+        .video-info {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .video-thumbnail {
+            width: 120px;
+            height: 68px;
+            object-fit: cover;
+            border-radius: var(--border-radius);
+            margin-right: 15px;
+            box-shadow: var(--box-shadow);
+        }
+
+        .video-details {
+            flex: 1;
+        }
+
+        .timestamp {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 8px;
+        }
+
+        /* Transcript Content */
+        .transcript-content-wrapper {
+            position: relative;
+        }
+
+        /* Enhanced Text Content */
+        .summary-content, #transcript-content, #translated-transcript {
+            line-height: 1.7;
+            max-width: var(--content-max-width);
+            margin: 0 auto;
+        }
+
+        #transcript-content, #translated-transcript {
+            white-space: pre-wrap;
+            font-family: var(--font-mono);
+            font-size: 0.95rem;
+            background-color: var(--code-bg);
+            padding: 15px;
+            border-radius: var(--border-radius);
+            margin-bottom: 15px;
+            tab-size: 4;
+        }
+
+        /* Text Styling Classes */
+        .text-justify {
+            text-align: justify;
+            text-justify: inter-word;
+        }
+
+        .line-height-large {
+            line-height: 2.0;
+        }
+
+        .line-height-normal {
+            line-height: 1.7;
+        }
+
+        .line-height-compact {
+            line-height: 1.4;
+        }
+
+        .reading-mode {
+            max-width: 70ch;
+            margin: 0 auto;
+        }
+
+        .paragraph-spacing-large p {
+            margin-bottom: 1.5rem;
+        }
+
+        .paragraph-spacing-normal p {
+            margin-bottom: 1rem;
+        }
+
+        .paragraph-spacing-small p {
+            margin-bottom: 0.5rem;
+        }
+
+        /* Formatted Transcript */
+        .formatted-text h1, .formatted-text h2, .formatted-text h3 {
+            margin-top: 1.5rem;
+            margin-bottom: 1rem;
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+
+        .formatted-text blockquote {
+            border-left: 4px solid var(--quote-border);
+            padding: 0.5rem 1rem;
+            margin: 1rem 0;
+            background-color: var(--quote-bg);
+            border-radius: 0 var(--border-radius) var(--border-radius) 0;
+        }
+
+        .formatted-text pre {
+            background-color: var(--code-bg);
+            padding: 1rem;
+            border-radius: var(--border-radius);
+            overflow-x: auto;
+            margin: 1rem 0;
+        }
+
+        .formatted-text code {
+            font-family: var(--font-mono);
+            background-color: var(--code-bg);
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+        }
+
+        /* Loader Animation */
+        .pulse-loader {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .pulse {
+            width: 20px;
+            height: 20px;
+            background-color: var(--primary-color);
+            border-radius: 50%;
+            margin: 0 10px;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        .pulse:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .pulse:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.5); opacity: 0.5; }
+        }
+
+        /* Transcript Navigation */
+        .transcript-nav {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        /* Theme buttons */
+        .theme-palette {
+            display: flex;
+            margin-top: 10px;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        .color-theme-btn {
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+        
+        .color-theme-btn:hover {
+            transform: scale(1.2);
+        }
+        
+        .color-theme-btn.active {
+            border-color: var(--text-color);
+        }
+        
+        .theme-default { background: linear-gradient(135deg, #ff4757 50%, #2e86de 50%); }
+        .theme-blue { background: linear-gradient(135deg, #3498db 50%, #2c3e50 50%); }
+        .theme-green { background: linear-gradient(135deg, #2ecc71 50%, #27ae60 50%); }
+        .theme-purple { background: linear-gradient(135deg, #9b59b6 50%, #8e44ad 50%); }
+        .theme-dark { background: linear-gradient(135deg, #34495e 50%, #2c3e50 50%); }
+
+        /* Mobile responsiveness */
+        @media (max-width: 768px) {
+            .video-info {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .video-thumbnail {
+                margin-bottom: 15px;
+                width: 100%;
+                height: auto;
+                max-height: 120px;
+            }
+            
+            .text-controls {
+                flex-wrap: wrap;
+                gap: 5px;
+            }
+            
+            .theme-switch {
+                top: 5px;
+                right: 5px;
+            }
+        }
+
+        /* Print styles */
+        @media print {
+            .theme-switch, .btn, .language-selector, .text-controls {
+                display: none !important;
+            }
+            
+            body {
+                background-color: white;
+                color: black;
+            }
+            
+            .card {
+                border: 1px solid #ddd;
+                box-shadow: none;
+            }
+            
+            #transcript-content, #translated-transcript {
+                font-size: 12pt;
+                background: none;
+                color: black;
+            }
+        }
+
+        /* Additional Dark Mode Improvements */
+        [data-theme="dark"] .form-control,
+        [data-theme="dark"] .form-select {
+            background-color: var(--input-bg);
+            color: var(--text-color);
+            border-color: var(--border-color);
+        }
+
+        [data-theme="dark"] .form-control:focus,
+        [data-theme="dark"] .form-select:focus {
+            border-color: var(--secondary-color);
+            box-shadow: 0 0 0 0.25rem rgba(84, 160, 255, 0.25);
+        }
+
+        [data-theme="dark"] .accordion-button {
+            background-color: var(--accordion-bg);
+            color: var(--text-color);
+        }
+
+        [data-theme="dark"] .accordion-button:not(.collapsed) {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        [data-theme="dark"] .bg-light {
+            background-color: var(--dark-color) !important;
+            color: var(--text-color);
+        }
+
+        [data-theme="dark"] .text-btn {
+            background-color: var(--dark-color);
+            border-color: var(--border-color);
+        }
+
+        [data-theme="dark"] .btn-outline-primary {
+            color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+
+        [data-theme="dark"] .btn-outline-primary:hover {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        [data-theme="dark"] .btn-outline-secondary {
+            color: var(--secondary-color);
+            border-color: var(--secondary-color);
+        }
+
+        [data-theme="dark"] .btn-outline-secondary:hover {
+            background-color: var(--secondary-color);
+            color: white;
+        }
+
+        /* Tab Navigation for Feature Sections */
+        .nav-tabs {
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 1rem;
+        }
+
+        .nav-tabs .nav-link {
+            color: var(--text-muted);
+            background-color: var(--tab-inactive-bg);
+            border: 1px solid transparent;
+            border-top-left-radius: var(--border-radius);
+            border-top-right-radius: var(--border-radius);
+            padding: 0.75rem 1.25rem;
+            font-weight: 500;
+            margin-right: 0.25rem;
+            transition: all 0.3s ease;
+        }
+
+        .nav-tabs .nav-link:hover {
+            border-color: var(--border-color);
+            color: var(--text-color);
+        }
+
+        .nav-tabs .nav-link.active {
+            color: var(--tab-active-text);
+            background-color: var(--tab-active-bg);
+            border-color: var(--border-color) var(--border-color) transparent;
+            border-bottom: 2px solid var(--primary-color);
+        }
+
+        [data-theme="dark"] .nav-tabs .nav-link.active {
+            color: var(--tab-active-text);
+            background-color: var(--tab-active-bg);
+        }
+
+        /* Video Download Section */
+        .format-option {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            background-color: var(--card-bg);
+            transition: all 0.2s ease;
+        }
+
+        .format-option:hover {
+            border-color: var(--primary-color);
+            transform: translateY(-2px);
+            box-shadow: var(--box-shadow);
+        }
+
+        .format-option .format-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .format-option .format-title {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .format-option .format-details {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .format-option .download-btn {
+            padding: 0.5rem 1rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- Theme Switch for Dark/Light mode -->
+    <div class="theme-switch">
+        <label for="theme-toggle"><i class="fas fa-moon"></i></label>
+        <label class="switch">
+            <input type="checkbox" id="theme-toggle">
+            <span class="slider"></span>
+        </label>
+    </div>
+
+    <!-- Navigation Bar -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-light fixed-top shadow-sm">
+        <div class="container">
+            <a class="navbar-brand d-flex align-items-center" href="/">
+                <i class="fa-brands fa-youtube fa-lg me-2" style="color: #e51f33;"></i>
+                <span class="fw-bold">YouTube Summarizer</span>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/"><i class="fas fa-home me-1"></i> Home</a>
+                    </li>
+                    {% if current_user.is_authenticated %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('user_dashboard') }}"><i class="fas fa-chart-line me-1"></i> Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('my_videos') }}"><i class="fas fa-video me-1"></i> My Videos</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('api_keys') }}"><i class="fas fa-key me-1"></i> API Keys</a>
+                    </li>
+                    {% endif %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="#"><i class="fas fa-question-circle me-1"></i> Help</a>
+                    </li>
+                </ul>
+                <div class="d-flex">
+                    {% if current_user.is_authenticated %}
+                    <div class="dropdown">
+                        <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-user-circle me-1"></i> {{ current_user.username }}
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                            <li><a class="dropdown-item" href="{{ url_for('profile') }}"><i class="fas fa-user-cog me-1"></i> Profile</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt me-1"></i> Logout</a></li>
+                        </ul>
+                    </div>
+                    {% else %}
+                    <a href="{{ url_for('login') }}" class="btn btn-outline-primary me-2"><i class="fas fa-sign-in-alt me-1"></i> Login</a>
+                    <a href="{{ url_for('register') }}" class="btn btn-primary"><i class="fas fa-user-plus me-1"></i> Register</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content Container (with padding for fixed navbar) -->
+    <div class="container" style="padding-top: 5rem;">
+        <div class="text-center mb-4">
+            <h1 class="fw-bold"><i class="fa-brands fa-youtube fa-spin fa-sm" style="color: #e51f33;"></i> YouTube Summarizer</h1>
+            <p class="text-muted">
+                Powered by Azure OpenAI and Whisper | <span class="badge bg-secondary">Translate to 10+ languages</span>
+            </p>
+        </div>
+        
+        <!-- Feature Showcase Section -->
+        <div class="row mb-4">
+            <div class="col-md-4 mb-3">
+                <div class="card h-100 border-0 shadow-sm">
+                    <div class="card-body text-center">
+                        <i class="fas fa-comment-dots fa-3x mb-3" style="color: var(--primary-color);"></i>
+                        <h4>AI Transcription</h4>
+                        <p>Get accurate transcripts of any YouTube video with advanced AI technology</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <div class="card h-100 border-0 shadow-sm">
+                    <div class="card-body text-center">
+                        <i class="fas fa-file-alt fa-3x mb-3" style="color: var(--secondary-color);"></i>
+                        <h4>Smart Summaries</h4>
+                        <p>Save time with AI-generated summaries that capture key points and insights</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <div class="card h-100 border-0 shadow-sm">
+                    <div class="card-body text-center">
+                        <i class="fas fa-language fa-3x mb-3" style="color: var(--success-color);"></i>
+                        <h4>Multi-language</h4>
+                        <p>Translate content into 10+ languages for global accessibility</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Login/Register Prompt -->
+        {% if not current_user.is_authenticated %}
+        <div class="alert alert-info mb-4">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Create an account</strong> to save your summaries and access more features!
+                </div>
+                <div>
+                    <a href="{{ url_for('login') }}" class="btn btn-outline-primary btn-sm me-2">Login</a>
+                    <a href="{{ url_for('register') }}" class="btn btn-primary btn-sm">Register</a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Featured Videos Section -->
+        {% if featured_videos and featured_videos|length > 0 %}
+        <div class="mb-4">
+            <h2 class="fw-bold mb-3">Featured Videos</h2>
+            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+                {% for video in featured_videos %}
+                <div class="col">
+                    <div class="card h-100 shadow-sm">
+                        <img src="{{ video.thumbnail }}" class="card-img-top" alt="{{ video.title }}">
+                        <div class="card-body">
+                            <h5 class="card-title text-truncate">{{ video.title }}</h5>
+                            <p class="card-text text-muted">
+                                <i class="fas fa-user me-1"></i> {{ video.channel }}<br>
+                                <i class="fas fa-clock me-1"></i> {% if video.length_formatted %}
+                                    {{ video.length_formatted }}
+                                {% elif video.length_seconds is defined and video.length_seconds %}
+                                    {{ (video.length_seconds|int // 60) }}:{{ (video.length_seconds|int % 60)|zfill(2) }}
+                                {% else %}
+                                    Unknown duration
+                                {% endif %}
+                            </p>
+                            <a href="{{ url_for('view_video', video_id=video._id) }}" class="btn btn-sm btn-primary">View Summary</a>
+                            <a href="https://www.youtube.com/watch?v={{ video.youtube_id }}" target="_blank" class="btn btn-sm btn-outline-secondary">
+                                <i class="fab fa-youtube"></i> Watch
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+            
+            <div class="theme-palette">
+                <div class="color-theme-btn theme-default active" data-theme="default" title="Default Theme"></div>
+                <div class="color-theme-btn theme-blue" data-theme="blue" title="Blue Theme"></div>
+                <div class="color-theme-btn theme-green" data-theme="green" title="Green Theme"></div>
+                <div class="color-theme-btn theme-purple" data-theme="purple" title="Purple Theme"></div>
+                <div class="color-theme-btn theme-dark" data-theme="dark" title="Dark Theme"></div>
+            </div>
+        </div>
+        
+        <!-- Add tab navigation -->
+        <ul class="nav nav-tabs mb-3" id="featureTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="summarize-tab" data-bs-toggle="tab" data-bs-target="#summarize-pane" 
+                        type="button" role="tab" aria-controls="summarize-pane" aria-selected="true">
+                    <i class="fas fa-file-alt me-2"></i>Summarize
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="download-tab" data-bs-toggle="tab" data-bs-target="#download-pane" 
+                        type="button" role="tab" aria-controls="download-pane" aria-selected="false">
+                    <i class="fas fa-download me-2"></i>Download
+                </button>
+            </li>
+        </ul>
+
+        <!-- Tab Content -->
+        <div class="tab-content" id="myTabContent">
+            {% if current_user.is_authenticated %}
+            <!-- Summarize Tab Pane -->
+            <div class="tab-pane fade show active" id="summarize-pane" role="tabpanel" aria-labelledby="summarize-tab">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span><i class="fas fa-link me-2"></i>Enter YouTube URL to Summarize</span>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="advanced-settings-toggle">
+                            <label class="form-check-label" for="advanced-settings-toggle">Advanced Settings</label>
+                        </div>
+                    </div>
+            <div class="card-body">
+                <div class="input-group mb-3">
+                    <input type="text" class="form-control url-input" id="youtube-url" 
+                           placeholder="https://www.youtube.com/watch?v=...">
+                            <button class="btn btn-primary submit-btn" id="summarize-btn">
+                                <i class="fas fa-magic me-2"></i>Summarize
+                            </button>
+                </div>
+                        
+                        <div id="advanced-settings" class="collapse mb-3">
+                            <div class="card">
+                                <div class="card-body bg-light">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="form-group mb-3">
+                                                <label for="chunk-duration" class="form-label">Chunk Duration (minutes):</label>
+                                                <input type="range" class="form-range" id="chunk-duration" min="1" max="30" value="10">
+                                                <div class="d-flex justify-content-between">
+                                                    <small>1 min</small>
+                                                    <small id="duration-value">10 min</small>
+                                                    <small>30 min</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="form-group mb-3">
+                                                <label for="audio-quality" class="form-label">Audio Quality:</label>
+                                                <select id="audio-quality" class="form-select">
+                                                    <option value="highest">Highest</option>
+                                                    <option value="medium">Medium</option>
+                                                    <option value="lowest">Lowest</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="auto-translate">
+                                        <label class="form-check-label" for="auto-translate">
+                                            Auto-translate summary and transcript
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                <div class="error-message" id="error-message"></div>
+            </div>
+        </div>
+        
+        <div id="loading" class="text-center my-5">
+                    <div class="pulse-loader">
+                        <div class="pulse"></div>
+                        <div class="pulse"></div>
+                        <div class="pulse"></div>
+            </div>
+                    <p class="mt-3" id="loading-message">Processing your video</p>
+                    <div class="progress mt-3">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary" 
+                             role="progressbar" style="width: 0%" id="progress-bar"></div>
+                    </div>
+                    <p class="text-muted small mt-2">This may take several minutes for longer videos</p>
+        </div>
+        
+        <div class="results" id="results">
+            <div class="card">
+                        <div class="card-header">
+                            <i class="fas fa-video me-2"></i>Video Information
+                        </div>
+                <div class="card-body">
+                            <div class="video-info">
+                                <img src="" id="video-thumbnail" class="video-thumbnail" alt="Video thumbnail">
+                                <div class="video-details">
+                    <h5 class="card-title" id="video-title"></h5>
+                                    <p class="card-text mb-1">
+                                        <i class="fas fa-user me-1"></i> <span id="video-author"></span>
+                                    </p>
+                    <p class="card-text">
+                                        <i class="fas fa-clock me-1"></i> <span id="video-duration"></span>
+                    </p>
+                                </div>
+                            </div>
+                            <div class="timestamp text-end">
+                                Processed on <span id="timestamp"></span>
+                            </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <span><i class="fas fa-file-alt me-2"></i>Summary</span>
+                            <div class="text-controls">
+                                <button class="text-btn" data-size="smaller" title="Smaller text"><i class="fas fa-minus"></i></button>
+                                <button class="text-btn" data-size="reset" title="Reset text size"><i class="fas fa-font"></i></button>
+                                <button class="text-btn" data-size="larger" title="Larger text"><i class="fas fa-plus"></i></button>
+                            </div>
+                        </div>
+                <div class="card-body">
+                            <div class="text-controls mb-3">
+                                <label>Format:</label>
+                                <button class="text-btn text-format-btn active" data-format="normal" title="Normal">Normal</button>
+                                <button class="text-btn text-format-btn" data-format="justified" title="Justified">Justified</button>
+                                <button class="text-btn text-format-btn" data-format="reading" title="Reading Mode">Reading</button>
+                                <div class="ms-auto">
+                                    <button class="text-btn" data-spacing="normal" title="Normal spacing"><i class="fas fa-align-justify"></i></button>
+                                    <button class="text-btn" data-line-height="normal" title="Line height"><i class="fas fa-text-height"></i></button>
+                                </div>
+                            </div>
+                            <div id="summary-content" class="summary-content formatted-text"></div>
+                </div>
+            </div>
+            
+            <div class="card">
+                        <div class="card-header">
+                            <i class="fas fa-language me-2"></i>Full Transcript
+                        </div>
+                <div class="card-body">
+                            <div class="language-selector">
+                                <label for="target-language"><i class="fas fa-globe me-2"></i>Translate to:</label>
+                                <select class="form-select form-select-sm w-auto" id="target-language">
+                                    <option value="original" selected>Original</option>
+                                    <option value="Spanish">Spanish</option>
+                                    <option value="French">French</option>
+                                    <option value="German">German</option>
+                                    <option value="Italian">Italian</option>
+                                    <option value="Portuguese">Portuguese</option>
+                                    <option value="Russian">Russian</option>
+                                    <option value="Japanese">Japanese</option>
+                                    <option value="Chinese">Chinese</option>
+                                    <option value="Korean">Korean</option>
+                                    <option value="Arabic">Arabic</option>
+                                    <option value="Hindi">Hindi</option>
+                                </select>
+                                <button class="btn btn-sm btn-primary" id="translate-btn">
+                                    <i class="fas fa-language me-1"></i>Translate
+                                </button>
+                                <div id="translation-loading" class="spinner-border spinner-border-sm text-primary" role="status">
+                                    <span class="visually-hidden">Translating...</span>
+                                </div>
+                            </div>
+                            
+                    <div class="accordion" id="transcript-accordion">
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="transcript-heading">
+                                <button class="accordion-button collapsed" type="button" 
+                                        data-bs-toggle="collapse" data-bs-target="#transcript-collapse" 
+                                        aria-expanded="false" aria-controls="transcript-collapse">
+                                            <i class="fas fa-file-alt me-2"></i>Show Full Transcript
+                                </button>
+                            </h2>
+                            <div id="transcript-collapse" class="accordion-collapse collapse" 
+                                 aria-labelledby="transcript-heading" data-bs-parent="#transcript-accordion">
+                                <div class="accordion-body">
+                                            <div class="text-controls mb-3">
+                                                <label>Text Size:</label>
+                                                <button class="text-btn" data-target="transcript" data-size="smaller" title="Smaller text"><i class="fas fa-minus"></i></button>
+                                                <button class="text-btn" data-target="transcript" data-size="reset" title="Reset font size"><i class="fas fa-font"></i></button>
+                                                <button class="text-btn" data-target="transcript" data-size="larger" title="Larger text"><i class="fas fa-plus"></i></button>
+                                                
+                                                <div class="ms-2 me-2">|</div>
+                                                
+                                                <label>Display:</label>
+                                                <button class="text-btn transcript-format-btn active" data-format="plain" title="Plain text"><i class="fas fa-align-left"></i></button>
+                                                <button class="text-btn transcript-format-btn" data-format="paragraphs" title="Format paragraphs"><i class="fas fa-paragraph"></i></button>
+                                                <button class="text-btn transcript-format-btn" data-format="timestamps" title="Show timestamps"><i class="fas fa-clock"></i></button>
+                                </div>
+                                            <div class="transcript-content-wrapper">
+                                                <pre id="transcript-content"></pre>
+                                                <pre id="translated-transcript"></pre>
+                                            </div>
+                                            <div class="transcript-nav">
+                                                <button class="btn btn-sm btn-outline-primary" id="copy-transcript">
+                                                    <i class="fas fa-copy me-1"></i>Copy to Clipboard
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-secondary" id="download-transcript">
+                                                    <i class="fas fa-download me-1"></i>Download
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-secondary" id="print-transcript">
+                                                    <i class="fas fa-print me-1"></i>Print
+                                                </button>
+                                            </div>
+                                        </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mt-4 text-center">
+                        <button class="btn btn-secondary" id="reset-btn">
+                            <i class="fas fa-redo me-2"></i>Process Another Video
+                        </button>
+            </div>
+        </div>
+    </div>
+            
+            {% endif %}
+            
+            <!-- Download Tab Pane -->
+            <div class="tab-pane fade" id="download-pane" role="tabpanel" aria-labelledby="download-tab">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span><i class="fas fa-link me-2"></i>Enter YouTube URL to Download</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="input-group mb-3">
+                            <input type="text" class="form-control url-input" id="download-youtube-url" 
+                                   placeholder="https://www.youtube.com/watch?v=...">
+                            <button class="btn btn-primary submit-btn" id="fetch-formats-btn">
+                                <i class="fas fa-search me-2"></i>Fetch Formats
+                            </button>
+                        </div>
+                        <div class="error-message" id="download-error-message"></div>
+                    </div>
+                </div>
+                
+                <div id="download-loading" class="text-center my-5" style="display: none;">
+                    <div class="pulse-loader">
+                        <div class="pulse"></div>
+                        <div class="pulse"></div>
+                        <div class="pulse"></div>
+                    </div>
+                    <p class="mt-3">Fetching available download formats...</p>
+                </div>
+                
+                <div id="download-results" style="display: none;">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <i class="fas fa-video me-2"></i>Video Information
+                        </div>
+                        <div class="card-body">
+                            <div class="video-info">
+                                <img src="" id="download-video-thumbnail" class="video-thumbnail" alt="Video thumbnail">
+                                <div class="video-details">
+                                    <h5 class="card-title" id="download-video-title"></h5>
+                                    <p class="card-text mb-1">
+                                        <i class="fas fa-user me-1"></i> <span id="download-video-author"></span>
+                                    </p>
+                                    <p class="card-text">
+                                        <i class="fas fa-clock me-1"></i> <span id="download-video-duration"></span>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-header">
+                            <i class="fas fa-list me-2"></i>Available Formats
+                        </div>
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between mb-3">
+                                <div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="radio" name="format-type" id="video-formats" value="video" checked>
+                                        <label class="form-check-label" for="video-formats">Video</label>
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="radio" name="format-type" id="audio-formats" value="audio">
+                                        <label class="form-check-label" for="audio-formats">Audio Only</label>
+                                    </div>
+                                </div>
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="sortDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                                        Sort By
+                                    </button>
+                                    <ul class="dropdown-menu" aria-labelledby="sortDropdown">
+                                        <li><a class="dropdown-item sort-option" data-sort="quality" href="#">Quality (High to Low)</a></li>
+                                        <li><a class="dropdown-item sort-option" data-sort="size" href="#">Size (Small to Large)</a></li>
+                                        <li><a class="dropdown-item sort-option" data-sort="type" href="#">Format Type</a></li>
+                                    </ul>
+                                </div>
+                            </div>
+                            <div id="formats-container">
+                                <!-- Format options will be inserted here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <footer class="text-center text-muted mt-4 mb-3">
+        <p><small>Built by Haraprasad with <i class="fas fa-heart" style="color:var(--primary-color)"></i> using Azure OpenAI</small></p>
+    </footer>
+    <div
+  id="cf-turnstile"
+  class="cf-turnstile"
+  data-sitekey="{{ TURNSTILE_SITE_KEY }}"
+  data-size="invisible"
+  data-callback="onTurnstileSuccess"
+></div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        function formatDuration(seconds) {
+            if (!seconds) return "00:00";
+            seconds = parseInt(seconds);
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const secs = seconds % 60;
+            
+            if (hours > 0) {
+                return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            } else {
+                return `${minutes}:${secs.toString().padStart(2, '0')}`;
+            }
+        }
+        
+        // Declare global variables for Cloudflare Turnstile
+        let widgetId = null;
+        let pendingArgs = null;
+        
+        // Initialize Turnstile on page load
+        document.addEventListener("DOMContentLoaded", () => {
+            console.log("Document loaded, initializing Turnstile...");
+            if (typeof turnstile !== 'undefined') {
+                initTurnstile();
+            } else {
+                console.error("Turnstile API not loaded yet");
+            }
+        });
+
+        // Initialize Turnstile when the script loads
+        function initTurnstile() {
+            console.log("Initializing Turnstile...");
+            widgetId = turnstile.render('#cf-turnstile', {
+                sitekey: '{{ TURNSTILE_SITE_KEY }}',
+                callback: function(token) {
+                    console.log("Turnstile callback received with token");
+                    onTurnstileSuccess(token);
+                }
+            });
+            console.log("Turnstile initialized with ID:", widgetId);
+        }
+        // Expose globally for the onload handler
+        window.initTurnstile = initTurnstile;
+
+        // API helper with Turnstile integration
+        function withTurnstile(apiFuncName, argsObj) {
+            const apiEndpoints = {
+                'summarize': '/api/summarize',
+                'translate': '/api/translate',
+                'get_formats': '/api/get_formats',
+                'download': '/api/download',
+                'cleanup': '/api/cleanup'
+            };
+            
+            // For cleanup requests, just make a direct call without Turnstile
+            if (apiFuncName === 'cleanup') {
+                return fetch(apiEndpoints[apiFuncName], {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(argsObj)
+                })
+                .then(response => response.json())
+                .catch(error => {
+                    console.error("Cleanup error:", error);
+                    return { success: false, error: error.message };
+                });
+            }
+            
+            // For other requests, use Turnstile
+            return new Promise((resolve, reject) => {
+                pendingArgs = {
+                    apiEndpoint: apiEndpoints[apiFuncName],
+                    args: argsObj,
+                    resolve: resolve,
+                    reject: reject
+                };
+                
+                // Reset and execute Turnstile
+                if (widgetId) {
+                    console.log("Executing Turnstile challenge for:", apiFuncName);
+                    turnstile.reset(widgetId);
+                    turnstile.execute(widgetId);
+                } else {
+                    console.error("Turnstile widget ID not available");
+                    reject(new Error("Turnstile not initialized"));
+                }
+            });
+        }
+        
+        // Turnstile success callback - handles API requests
+        function onTurnstileSuccess(token) {
+            console.log("Turnstile success with token:", token.substring(0, 10) + "...");
+            const { apiEndpoint, args, resolve, reject } = pendingArgs || {};
+            if (!apiEndpoint || !args) {
+                console.error("No pending API request for Turnstile token");
+                return;
+            }
+
+            // Copy args and inject the token
+            const requestData = { ...args };
+            requestData['cf-turnstile-response'] = token;
+
+            console.log("Making API call to:", apiEndpoint);
+            // Make the API call
+            fetch(apiEndpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestData)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(data => { 
+                        throw new Error(data.error || 'An error occurred'); 
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log("API call successful");
+                resolve(data);
+            })
+            .catch(error => {
+                console.error("API call failed:", error);
+                reject(error);
+            });
+        }
+        window.onTurnstileSuccess = onTurnstileSuccess;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Main elements
+            const youtubeUrlInput = document.getElementById('youtube-url');
+            const summarizeBtn = document.getElementById('summarize-btn');
+            const resetBtn = document.getElementById('reset-btn');
+            const loadingSection = document.getElementById('loading');
+            const resultsSection = document.getElementById('results');
+            const errorMessage = document.getElementById('error-message');
+            const progressBar = document.getElementById('progress-bar');
+            const loadingMessage = document.getElementById('loading-message');
+            
+            // Advanced settings elements
+            const advancedToggle = document.getElementById('advanced-settings-toggle');
+            const advancedSettings = document.getElementById('advanced-settings');
+            const chunkDuration = document.getElementById('chunk-duration');
+            const durationValue = document.getElementById('duration-value');
+            const audioQuality = document.getElementById('audio-quality');
+            const autoTranslate = document.getElementById('auto-translate');
+            
+            // Video info elements
+            const videoTitle = document.getElementById('video-title');
+            const videoAuthor = document.getElementById('video-author');
+            const videoDuration = document.getElementById('video-duration');
+            const videoThumbnail = document.getElementById('video-thumbnail');
+            const timestamp = document.getElementById('timestamp');
+            const summaryContent = document.getElementById('summary-content');
+            const transcriptContent = document.getElementById('transcript-content');
+            
+            // Translation elements
+            const targetLanguageSelect = document.getElementById('target-language');
+            const translateBtn = document.getElementById('translate-btn');
+            const translationLoading = document.getElementById('translation-loading');
+            const translatedTranscript = document.getElementById('translated-transcript');
+            
+            // Transcript interaction elements
+            const copyTranscriptBtn = document.getElementById('copy-transcript');
+            const downloadTranscriptBtn = document.getElementById('download-transcript');
+            const printTranscriptBtn = document.getElementById('print-transcript');
+            
+            // Text formatting elements
+            const textFormatBtns = document.querySelectorAll('.text-format-btn');
+            const transcriptFormatBtns = document.querySelectorAll('.transcript-format-btn');
+            const spacingBtns = document.querySelectorAll('[data-spacing]');
+            const lineHeightBtns = document.querySelectorAll('[data-line-height]');
+            
+            // Theme elements
+            const themeToggle = document.getElementById('theme-toggle');
+            const colorThemeBtns = document.querySelectorAll('.color-theme-btn');
+            
+            // Store data
+            let originalTranscript = '';
+            let currentVideoId = '';
+            let fontSize = {
+                summary: 16,
+                transcript: 14
+            };
+            
+            // Theme colors definition
+            const themeColors = {
+                default: {
+                    light: {
+                        primary: '#ff4757',
+                        secondary: '#2e86de'
+                    },
+                    dark: {
+                        primary: '#ff6b81',
+                        secondary: '#54a0ff'
+                    }
+                },
+                blue: {
+                    light: {
+                        primary: '#3498db',
+                        secondary: '#2980b9'
+                    },
+                    dark: {
+                        primary: '#3498db',
+                        secondary: '#2980b9'
+                    }
+                },
+                green: {
+                    light: {
+                        primary: '#2ecc71',
+                        secondary: '#27ae60'
+                    },
+                    dark: {
+                        primary: '#2ecc71',
+                        secondary: '#27ae60'
+                    }
+                },
+                purple: {
+                    light: {
+                        primary: '#9b59b6',
+                        secondary: '#8e44ad'
+                    },
+                    dark: {
+                        primary: '#9b59b6',
+                        secondary: '#8e44ad'
+                    }
+                },
+                dark: {
+                    light: {
+                        primary: '#34495e',
+                        secondary: '#2c3e50'
+                    },
+                    dark: {
+                        primary: '#34495e',
+                        secondary: '#2c3e50'
+                    }
+                }
+            };
+            
+            // Initialize UI
+            updateDurationLabel();
+            initializeThemeHandlers();
+            initializeTextFormatting();
+            
+            // Theme initialization and handlers
+            function initializeThemeHandlers() {
+                // Dark/Light mode toggle
+                themeToggle.addEventListener('change', function() {
+                    const currentTheme = document.documentElement.getAttribute('data-theme');
+                    const newTheme = this.checked ? 'dark' : 'light';
+                    applyTheme(newTheme);
+                });
+                
+                // Check for saved theme preference or system preference
+                const savedTheme = localStorage.getItem('theme');
+                const savedColorTheme = localStorage.getItem('colorTheme') || 'default';
+                
+                if (savedTheme) {
+                    document.documentElement.setAttribute('data-theme', savedTheme);
+                    themeToggle.checked = savedTheme === 'dark';
+                } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                    themeToggle.checked = true;
+                }
+                
+                // Apply saved color theme if exists
+                if (savedColorTheme) {
+                    applyColorTheme(savedColorTheme);
+                    document.querySelector(`.color-theme-btn.theme-${savedColorTheme}`).classList.add('active');
+                }
+                
+                // Color theme buttons
+                colorThemeBtns.forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const theme = this.dataset.theme;
+                        
+                        // Remove active class from all buttons
+                        colorThemeBtns.forEach(b => b.classList.remove('active'));
+                        // Add active class to clicked button
+                        this.classList.add('active');
+                        
+                        applyColorTheme(theme);
+                    });
+                });
+            }
+            
+            // Apply theme (dark or light)
+            function applyTheme(theme) {
+                document.documentElement.setAttribute('data-theme', theme);
+                localStorage.setItem('theme', theme);
+                
+                // Apply color theme with the new base theme
+                const colorTheme = localStorage.getItem('colorTheme') || 'default';
+                applyColorTheme(colorTheme);
+            }
+            
+            // Apply color theme
+            function applyColorTheme(theme) {
+                const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+                const colors = themeColors[theme][currentTheme];
+                
+                document.documentElement.style.setProperty('--primary-color', colors.primary);
+                document.documentElement.style.setProperty('--secondary-color', colors.secondary);
+                
+                localStorage.setItem('colorTheme', theme);
+            }
+            
+            // Initialize text formatting options
+            function initializeTextFormatting() {
+                // Summary text format buttons
+                textFormatBtns.forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        // Remove active class from all buttons
+                        textFormatBtns.forEach(b => b.classList.remove('active'));
+                        // Add active class to clicked button
+                        this.classList.add('active');
+                        
+                        const format = this.dataset.format;
+                        
+                        // Apply formatting
+                        summaryContent.classList.remove('text-justify', 'reading-mode');
+                        
+                        if (format === 'justified') {
+                            summaryContent.classList.add('text-justify');
+                        } else if (format === 'reading') {
+                            summaryContent.classList.add('reading-mode');
+                        }
+                    });
+                });
+                
+                // Transcript format buttons
+                transcriptFormatBtns.forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        // Remove active class from all buttons
+                        transcriptFormatBtns.forEach(b => b.classList.remove('active'));
+                        // Add active class to clicked button
+                        this.classList.add('active');
+                        
+                        const format = this.dataset.format;
+                        
+                        if (format === 'plain') {
+                            // Keep original formatting
+                            displayTranscript(originalTranscript, 'plain');
+                        } else if (format === 'paragraphs') {
+                            // Format transcript into paragraphs
+                            formatTranscriptIntoParagraphs();
+                        } else if (format === 'timestamps') {
+                            // Add timestamps to transcript
+                            addTimestampsToTranscript();
+                        }
+                    });
+                });
+                
+                // Line height buttons
+                lineHeightBtns.forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const height = this.dataset.lineHeight;
+                        cycleLineHeight(this);
+                    });
+                });
+                
+                // Paragraph spacing buttons
+                spacingBtns.forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const spacing = this.dataset.spacing;
+                        cycleParagraphSpacing(this);
+                    });
+                });
+            }
+            
+            // Cycle through line height options
+            function cycleLineHeight(button) {
+                const currentClass = summaryContent.classList.contains('line-height-large') ? 'large' :
+                                    summaryContent.classList.contains('line-height-compact') ? 'compact' : 'normal';
+                
+                // Remove all line height classes
+                summaryContent.classList.remove('line-height-large', 'line-height-normal', 'line-height-compact');
+                
+                // Apply next class in cycle
+                let nextClass;
+                if (currentClass === 'normal') {
+                    nextClass = 'large';
+                    button.innerHTML = '<i class="fas fa-text-height"></i> Large';
+                } else if (currentClass === 'large') {
+                    nextClass = 'compact';
+                    button.innerHTML = '<i class="fas fa-text-height"></i> Compact';
+                } else {
+                    nextClass = 'normal';
+                    button.innerHTML = '<i class="fas fa-text-height"></i>';
+                }
+                
+                summaryContent.classList.add(`line-height-${nextClass}`);
+            }
+            
+            // Cycle through paragraph spacing options
+            function cycleParagraphSpacing(button) {
+                const currentClass = summaryContent.classList.contains('paragraph-spacing-large') ? 'large' :
+                                    summaryContent.classList.contains('paragraph-spacing-small') ? 'small' : 'normal';
+                
+                // Remove all paragraph spacing classes
+                summaryContent.classList.remove('paragraph-spacing-large', 'paragraph-spacing-normal', 'paragraph-spacing-small');
+                
+                // Apply next class in cycle
+                let nextClass;
+                if (currentClass === 'normal') {
+                    nextClass = 'large';
+                    button.innerHTML = '<i class="fas fa-align-justify"></i> Large';
+                } else if (currentClass === 'large') {
+                    nextClass = 'small';
+                    button.innerHTML = '<i class="fas fa-align-justify"></i> Compact';
+                } else {
+                    nextClass = 'normal';
+                    button.innerHTML = '<i class="fas fa-align-justify"></i>';
+                }
+                
+                summaryContent.classList.add(`paragraph-spacing-${nextClass}`);
+            }
+            
+            // Format transcript into more readable paragraphs
+            function formatTranscriptIntoParagraphs() {
+                if (!originalTranscript) return;
+                
+                // Split by double line breaks or sentence endings
+                const sentences = originalTranscript.replace(/([.!?])\s+/g, "$1\n").split(/\n+/);
+                let paragraphs = [];
+                let currentParagraph = '';
+                
+                // Group sentences into paragraphs
+                sentences.forEach(sentence => {
+                    if (sentence.trim() === '') return;
+                    
+                    // Start a new paragraph every 3-5 sentences
+                    if (currentParagraph.split(/[.!?]/).length > 3 + Math.floor(Math.random() * 3)) {
+                        paragraphs.push(currentParagraph.trim());
+                        currentParagraph = '';
+                    }
+                    
+                    currentParagraph += sentence.trim() + ' ';
+                });
+                
+                // Add the last paragraph if not empty
+                if (currentParagraph.trim() !== '') {
+                    paragraphs.push(currentParagraph.trim());
+                }
+                
+                // Join paragraphs with double line breaks
+                const formattedText = paragraphs.join('\n\n');
+                displayTranscript(formattedText, 'paragraphs');
+            }
+            
+            // Add timestamps to transcript
+            function addTimestampsToTranscript() {
+                if (!originalTranscript) return;
+                
+                const videoLength = videoDuration.textContent || '10 minutes';
+                const lengthInSeconds = estimateDurationInSeconds(videoLength);
+                
+                // Split transcript into paragraphs
+                const paragraphs = originalTranscript.split(/\n\n+/);
+                let timestampedText = '';
+                
+                // Add a timestamp before each paragraph
+                paragraphs.forEach((paragraph, index) => {
+                    if (paragraph.trim() === '') return;
+                    
+                    const position = index / paragraphs.length;
+                    const timestampSeconds = Math.floor(position * lengthInSeconds);
+                    const timestamp = formatTimestamp(timestampSeconds);
+                    
+                    timestampedText += `[${timestamp}] ${paragraph.trim()}\n\n`;
+                });
+                
+                displayTranscript(timestampedText, 'timestamps');
+            }
+            
+            // Display transcript with specified format
+            function displayTranscript(text, format) {
+                if (translatedTranscript.style.display === 'block') {
+                    translatedTranscript.textContent = text;
+                } else {
+                    transcriptContent.textContent = text;
+                }
+            }
+            
+            // Estimate duration in seconds from text description
+            function estimateDurationInSeconds(durationText) {
+                const hours = (durationText.match(/(\d+)\s*hour/i) || [0, 0])[1];
+                const minutes = (durationText.match(/(\d+)\s*minute/i) || [0, 0])[1];
+                const seconds = (durationText.match(/(\d+)\s*second/i) || [0, 0])[1];
+                
+                return (parseInt(hours) * 3600) + (parseInt(minutes) * 60) + parseInt(seconds);
+            }
+            
+            // Format seconds into HH:MM:SS
+            function formatTimestamp(seconds) {
+                const h = Math.floor(seconds / 3600);
+                const m = Math.floor((seconds % 3600) / 60);
+                const s = seconds % 60;
+                
+                return `${h > 0 ? h + ':' : ''}${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+            }
+            
+            // Toggle advanced settings
+            advancedToggle.addEventListener('change', function() {
+                if (this.checked) {
+                    bootstrap.Collapse.getOrCreateInstance(advancedSettings).show();
+                } else {
+                    bootstrap.Collapse.getOrCreateInstance(advancedSettings).hide();
+                }
+            });
+            
+            // Update chunk duration label
+            chunkDuration.addEventListener('input', updateDurationLabel);
+            
+            function updateDurationLabel() {
+                durationValue.textContent = chunkDuration.value + ' min';
+            }
+            
+            // Format duration in human-readable format
+            function formatDuration(seconds) {
+                const hours = Math.floor(seconds / 3600);
+                const minutes = Math.floor((seconds % 3600) / 60);
+                const remainingSeconds = seconds % 60;
+                
+                let result = '';
+                if (hours > 0) {
+                    result += `${hours} hour${hours > 1 ? 's' : ''} `;
+                }
+                if (minutes > 0 || hours > 0) {
+                    result += `${minutes} minute${minutes > 1 ? 's' : ''} `;
+                }
+                result += `${remainingSeconds} second${remainingSeconds > 1 ? 's' : ''}`;
+                
+                return result;
+            }
+            
+            // Show error message
+            function showError(message) {
+                errorMessage.textContent = message;
+                errorMessage.style.display = 'block';
+                loadingSection.style.display = 'none';
+                
+                // Scroll to error message
+                errorMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            
+            // Reset UI for new video
+            function resetUI() {
+                youtubeUrlInput.value = '';
+                errorMessage.style.display = 'none';
+                loadingSection.style.display = 'none';
+                resultsSection.style.display = 'none';
+                targetLanguageSelect.value = 'original';
+                translatedTranscript.style.display = 'none';
+                transcriptContent.style.display = 'block';
+                progressBar.style.width = '0%';
+                originalTranscript = '';
+                currentVideoId = '';
+                
+                // Clear localStorage cache
+                localStorage.removeItem('lastTranscript');
+                localStorage.removeItem('lastVideoId');
+                
+                // Clear localStorage cache
+                localStorage.removeItem('lastTranscript');
+                localStorage.removeItem('lastVideoId');
+                
+                // Reset text formatting
+                summaryContent.classList.remove(
+                    'text-justify', 'reading-mode', 
+                    'line-height-large', 'line-height-compact',
+                    'paragraph-spacing-large', 'paragraph-spacing-small'
+                );
+                
+                textFormatBtns.forEach(btn => {
+                    if (btn.dataset.format === 'normal') {
+                        btn.classList.add('active');
+                    } else {
+                        btn.classList.remove('active');
+                    }
+                });
+                
+                transcriptFormatBtns.forEach(btn => {
+                    if (btn.dataset.format === 'plain') {
+                        btn.classList.add('active');
+                    } else {
+                        btn.classList.remove('active');
+                    }
+                });
+                
+                // Reset line height and spacing buttons
+                document.querySelector('[data-line-height]').innerHTML = '<i class="fas fa-text-height"></i>';
+                document.querySelector('[data-spacing]').innerHTML = '<i class="fas fa-align-justify"></i>';
+            }
+            
+            // Font size control for all elements
+            document.querySelectorAll('.text-btn[data-size]').forEach(button => {
+                button.addEventListener('click', function() {
+                    const target = this.dataset.target || 'summary';
+                    const action = this.dataset.size;
+                    const element = target === 'transcript' ? transcriptContent : summaryContent;
+                    
+                    switch(action) {
+                        case 'smaller':
+                            fontSize[target] = Math.max(10, fontSize[target] - 1);
+                            break;
+                        case 'larger':
+                            fontSize[target] = Math.min(24, fontSize[target] + 1);
+                            break;
+                        case 'reset':
+                            fontSize[target] = target === 'transcript' ? 14 : 16;
+                            break;
+                    }
+                    
+                    element.style.fontSize = `${fontSize[target]}px`;
+                    
+                    // Also apply to translated transcript if visible
+                    if (target === 'transcript') {
+                        translatedTranscript.style.fontSize = `${fontSize[target]}px`;
+                    }
+                });
+            });
+            
+            // Handle translation
+            translateBtn.addEventListener('click', function() {
+                const targetLanguage = targetLanguageSelect.value;
+                
+                // If original language is selected, show the original transcript
+                if (targetLanguage === 'original') {
+                    translatedTranscript.style.display = 'none';
+                    transcriptContent.style.display = 'block';
+                    return;
+                }
+                
+                // Try to retrieve transcript from localStorage if it's not in memory
+                if (!originalTranscript || originalTranscript.trim() === '') {
+                    console.log("No transcript in memory, checking localStorage...");
+                    const savedTranscript = localStorage.getItem('lastTranscript');
+                    const savedVideoId = localStorage.getItem('lastVideoId');
+                    
+                    if (savedTranscript && savedVideoId) {
+                        console.log("Found saved transcript in localStorage");
+                        originalTranscript = savedTranscript;
+                        currentVideoId = savedVideoId;
+                    } else {
+                        showError("No transcript available to translate. Please summarize a video first.");
+                        return;
+                    }
+                }
+                
+                // Additional check for empty transcript
+                if (!originalTranscript || originalTranscript.trim() === '') {
+                    showError("Transcript appears to be empty. Please summarize a video first.");
+                    return;
+                }
+                
+                // Show loading spinner, hide both transcripts while loading
+                translationLoading.style.display = 'inline-block';
+                translatedTranscript.style.display = 'none';
+                transcriptContent.style.display = 'none';
+                
+                // Call the translation API with Turnstile
+                console.log("Translating transcript, length:", originalTranscript ? originalTranscript.length : 0);
+                console.log("Target language:", targetLanguage);
+                console.log("Current video ID:", currentVideoId);
+                
+                withTurnstile('translate', {
+                    transcript: originalTranscript,
+                    target_language: targetLanguage,
+                    video_id: currentVideoId
+                })
+                .then(data => {
+                    // Update the translated transcript
+                    translatedTranscript.textContent = data.translated_transcript;
+                    translatedTranscript.style.fontSize = `${fontSize.transcript}px`;
+                    
+                    // Apply current transcript format if not plain
+                    const activeFormat = document.querySelector('.transcript-format-btn.active').dataset.format;
+                    if (activeFormat !== 'plain') {
+                        if (activeFormat === 'paragraphs') {
+                            formatTranscriptIntoParagraphs();
+                        } else if (activeFormat === 'timestamps') {
+                            addTimestampsToTranscript();
+                        }
+                    }
+                    
+                    // Hide loading, show translated transcript
+                    translationLoading.style.display = 'none';
+                    translatedTranscript.style.display = 'block';
+                    transcriptContent.style.display = 'none';
+                    
+                    // Show success message
+                    showToast(`Transcript translated to ${targetLanguage} successfully!`);
+                })
+                .catch(error => {
+                    console.error('Translation error:', error);
+                    showError(error.message || 'Failed to translate transcript');
+                    translationLoading.style.display = 'none';
+                    transcriptContent.style.display = 'block'; // Show original on error
+                });
+            });
+            
+            // When language changes to original, show original transcript
+            targetLanguageSelect.addEventListener('change', function() {
+                if (this.value === 'original') {
+                    translatedTranscript.style.display = 'none';
+                    transcriptContent.style.display = 'block';
+                }
+            });
+            
+            // Copy transcript to clipboard
+            copyTranscriptBtn.addEventListener('click', function() {
+                const textToCopy = translatedTranscript.style.display === 'block' ? 
+                    translatedTranscript.textContent : transcriptContent.textContent;
+                
+                navigator.clipboard.writeText(textToCopy)
+                    .then(() => {
+                        const originalText = copyTranscriptBtn.innerHTML;
+                        copyTranscriptBtn.innerHTML = '<i class="fas fa-check me-1"></i>Copied!';
+                        
+                        setTimeout(() => {
+                            copyTranscriptBtn.innerHTML = originalText;
+                        }, 2000);
+                    })
+                    .catch(err => {
+                        console.error('Failed to copy: ', err);
+                    });
+            });
+            
+            // Download transcript
+            downloadTranscriptBtn.addEventListener('click', function() {
+                const text = translatedTranscript.style.display === 'block' ? 
+                    translatedTranscript.textContent : transcriptContent.textContent;
+                const language = targetLanguageSelect.value === 'original' ? 'original' : targetLanguageSelect.value.toLowerCase();
+                const filename = `transcript_${currentVideoId}_${language}.txt`;
+                
+                const element = document.createElement('a');
+                element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
+                element.setAttribute('download', filename);
+                
+                element.style.display = 'none';
+                document.body.appendChild(element);
+                element.click();
+                document.body.removeChild(element);
+            });
+            
+            // Print transcript
+            printTranscriptBtn.addEventListener('click', function() {
+                const transcript = translatedTranscript.style.display === 'block' ? 
+                    translatedTranscript.textContent : transcriptContent.textContent;
+                const title = videoTitle.textContent || 'YouTube Transcript';
+                
+                // Create a new window for printing
+                const printWindow = window.open('', '_blank');
+                printWindow.document.write(`
+                    <html>
+                    <head>
+                        <title>Transcript: ${title}</title>
+                        <style>
+                            body {
+                                font-family: Arial, sans-serif;
+                                line-height: 1.6;
+                                margin: 2cm;
+                            }
+                            h1 {
+                                font-size: 18pt;
+                                margin-bottom: 1cm;
+                            }
+                            pre {
+                                white-space: pre-wrap;
+                                font-size: 12pt;
+                                font-family: inherit;
+                            }
+                            .footer {
+                                margin-top: 2cm;
+                                font-size: 9pt;
+                                color: #666;
+                                text-align: center;
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <h1>${title}</h1>
+                        <pre>${transcript}</pre>
+                        <div class="footer">Generated with YouTube Summarizer</div>
+                    </body>
+                    </html>
+                `);
+                
+                printWindow.document.close();
+                printWindow.focus();
+                
+                // Print after a short delay to ensure content is loaded
+                setTimeout(() => {
+                    printWindow.print();
+                    printWindow.close();
+                }, 250);
+            });
+            
+            // Simulate progress during processing
+            function simulateProgress() {
+                let width = 0;
+                const interval = setInterval(() => {
+                    if (width >= 90) {
+                        clearInterval(interval);
+                    } else {
+                        width += Math.random() * 2;
+                        progressBar.style.width = Math.min(90, width) + '%';
+                    }
+                }, 1000);
+                return interval;
+            }
+            
+            // Update loading message with stages
+            function updateLoadingStage(stage) {
+                const stages = {
+                    download: 'Downloading and extracting audio...',
+                    transcribe: 'Transcribing audio with Whisper...',
+                    summarize: 'Generating summary with GPT-4...',
+                    finishing: 'Finalizing results...'
+                };
+                
+                loadingMessage.textContent = stages[stage] || 'Processing your video...';
+            }
+
+let widgetId, pendingArgs;
+
+// 1) Ensure initTurnstile is defined **before** the CF script onload fires
+function initTurnstile() {
+  // render returns a widget ID synchronously
+  widgetId = turnstile.render('#cf-turnstile');
+}
+// expose globally if you’re using onload="initTurnstile()"
+window.initTurnstile = initTurnstile;
+
+// Handle summarize button click
+summarizeBtn.addEventListener('click', function() {
+  const youtubeUrl = youtubeUrlInput.value.trim();
+  if (!youtubeUrl) {
+    showError('Please enter a YouTube URL');
+    return;
+  }
+
+  // Show loader and hide results/errors
+  errorMessage.style.display = 'none';
+  loadingSection.style.display = 'block';
+  resultsSection.style.display = 'none';
+
+  // Start progress animation
+  const progressInterval = simulateProgress();
+  updateLoadingStage('download');
+
+  console.log("Starting video processing with Turnstile");
+  // Call the API with Turnstile
+  withTurnstile('summarize', {
+    youtube_url: youtubeUrl,
+    chunk_duration: Number(chunkDuration.value) * 60,
+    preferred_quality: audioQuality.value,
+    _progressInterval: progressInterval
+  })
+  .then(data => {
+    console.log("Video processed successfully");
+    clearInterval(progressInterval);
+    progressBar.style.width = '100%';
+
+    // Populate the UI with data
+    videoTitle.textContent = data.title;
+    videoAuthor.textContent = data.author;
+    videoDuration.textContent = formatDuration(data.length_seconds);
+    videoThumbnail.src = `https://i.ytimg.com/vi/${data.video_id}/hqdefault.jpg`;
+    videoThumbnail.alt = data.title;
+    
+    // Set summary content
+    summaryContent.innerHTML = formatMarkdown(data.summary);
+    
+    // Set transcript content
+    transcriptContent.textContent = data.transcript;
+    originalTranscript = data.transcript;
+    currentVideoId = data.video_id;
+    
+    // Save transcript to localStorage for persistence between tab switches
+    if (originalTranscript && currentVideoId) {
+        localStorage.setItem('lastTranscript', originalTranscript);
+        localStorage.setItem('lastVideoId', currentVideoId);
+    }
+    
+    // Save transcript to localStorage for persistence between tab switches
+    if (originalTranscript && currentVideoId) {
+        localStorage.setItem('lastTranscript', originalTranscript);
+        localStorage.setItem('lastVideoId', currentVideoId);
+    }
+    
+    // Update timestamp
+    timestamp.textContent = new Date().toLocaleString();
+    
+    // Hide loading section and show results
+    loadingSection.style.display = 'none';
+    resultsSection.style.display = 'block';
+
+    // Clean up temporary files
+    withTurnstile('cleanup', {})
+      .catch(err => console.error('Cleanup failed:', err));
+
+    // Scroll to results
+    resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  })
+  .catch(error => {
+    console.error('Processing error:', error);
+    clearInterval(progressInterval);
+    loadingSection.style.display = 'none';
+    showError(error.message || 'Failed to process video');
+  });
+});
+
+// Processing functionality handled by the withTurnstile function instead
+
+            
+            // Format markdown text into HTML
+            function formatMarkdown(text) {
+                // Basic markdown processing
+                return text
+                    // Convert headers
+                    .replace(/^### (.*?)$/gm, '<h3>$1</h3>')
+                    .replace(/^## (.*?)$/gm, '<h2>$1</h2>')
+                    .replace(/^# (.*?)$/gm, '<h1>$1</h1>')
+                    // Convert bold and italics
+                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                    .replace(/__(.*?)__/g, '<strong>$1</strong>')
+                    .replace(/_(.*?)_/g, '<em>$1</em>')
+                    // Convert lists
+                    .replace(/^\s*[-*+]\s+(.*?)$/gm, '<li>$1</li>')
+                    .replace(/(<li>.*?<\/li>\n)+/gs, '<ul>$&</ul>')
+                    // Convert blockquotes
+                    .replace(/^>\s+(.*?)$/gm, '<blockquote>$1</blockquote>')
+                    // Convert paragraphs (must be last)
+                    .replace(/\n\n/g, '</p><p>')
+                    .replace(/^(.+?)(?=<\/p>|$)/s, '<p>$1')
+                    .replace(/(?<=<p>)(.+?)$/s, '$1</p>');
+            }
+            
+            // Reset UI
+            resetBtn.addEventListener('click', resetUI);
+            
+            // Also allow pressing Enter to submit
+            youtubeUrlInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    summarizeBtn.click();
+                }
+            });
+            
+            // Create and show toast messages
+            function showToast(message, type = 'success') {
+                // Create toast container if it doesn't exist
+                let toastContainer = document.querySelector('.toast-container');
+                if (!toastContainer) {
+                    toastContainer = document.createElement('div');
+                    toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+                    document.body.appendChild(toastContainer);
+                }
+                
+                // Create toast
+                const toastId = 'toast-' + Date.now();
+                const toast = document.createElement('div');
+                toast.className = `toast bg-${type === 'success' ? 'success' : 'danger'} text-white`;
+                toast.id = toastId;
+                toast.setAttribute('role', 'alert');
+                toast.setAttribute('aria-live', 'assertive');
+                toast.setAttribute('aria-atomic', 'true');
+                
+                toast.innerHTML = `
+                    <div class="toast-header bg-${type === 'success' ? 'success' : 'danger'} text-white">
+                        <strong class="me-auto">${type === 'success' ? 'Success' : 'Error'}</strong>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+                    </div>
+                    <div class="toast-body">
+                        ${message}
+                    </div>
+                `;
+                
+                toastContainer.appendChild(toast);
+                
+                // Initialize and show toast
+                const toastInstance = new bootstrap.Toast(toast, { delay: 5000 });
+                toastInstance.show();
+                
+                // Remove toast after it's hidden
+                toast.addEventListener('hidden.bs.toast', function() {
+                    this.remove();
+                });
+            }
+        });
+
+        // Setup tab switching event handlers
+        document.addEventListener('DOMContentLoaded', function() {
+            // Listen for tab changes to preserve transcript state
+            const tabElements = document.querySelectorAll('[data-bs-toggle="tab"]');
+            tabElements.forEach(tab => {
+                tab.addEventListener('shown.bs.tab', event => {
+                    console.log("Tab switched:", event.target.id);
+                    
+                    // If switching back to summarize tab, make sure transcript is preserved
+                    if (event.target.id === 'summarize-tab' && originalTranscript === '') {
+                        // Try to get transcript from cache or local storage if needed
+                        const cachedTranscript = localStorage.getItem('lastTranscript');
+                        const cachedVideoId = localStorage.getItem('lastVideoId');
+                        
+                        if (cachedTranscript && cachedVideoId) {
+                            console.log("Restoring transcript from cache");
+                            originalTranscript = cachedTranscript;
+                            currentVideoId = cachedVideoId;
+                            
+                            // You could also restore other UI elements if needed
+                            if (transcriptContent) {
+                                transcriptContent.textContent = cachedTranscript;
+                            }
+                        }
+                    }
+                });
+            });
+        });
+        
+        // Download functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            // Download tab elements
+            const downloadYoutubeUrlInput = document.getElementById('download-youtube-url');
+            const fetchFormatsBtn = document.getElementById('fetch-formats-btn');
+            const downloadErrorMessage = document.getElementById('download-error-message');
+            const downloadLoading = document.getElementById('download-loading');
+            const downloadResults = document.getElementById('download-results');
+            const downloadVideoThumbnail = document.getElementById('download-video-thumbnail');
+            const downloadVideoTitle = document.getElementById('download-video-title');
+            const downloadVideoAuthor = document.getElementById('download-video-author');
+            const downloadVideoDuration = document.getElementById('download-video-duration');
+            const formatsContainer = document.getElementById('formats-container');
+            const videoFormatsRadio = document.getElementById('video-formats');
+            const audioFormatsRadio = document.getElementById('audio-formats');
+            const sortOptions = document.querySelectorAll('.sort-option');
+            
+            // Store available formats
+            let availableFormats = [];
+            let currentSortMethod = 'quality';
+            
+            // Fetch available formats
+            fetchFormatsBtn.addEventListener('click', function() {
+                const youtubeUrl = downloadYoutubeUrlInput.value.trim();
+                
+                if (!youtubeUrl) {
+                    showDownloadError('Please enter a YouTube URL');
+                    return;
+                }
+                
+                // Show loading and hide results/error
+                downloadErrorMessage.style.display = 'none';
+                downloadLoading.style.display = 'block';
+                downloadResults.style.display = 'none';
+                
+                // Call the API with Turnstile
+                withTurnstile('get_formats', {
+                    youtube_url: youtubeUrl
+                })
+                .then(data => {
+                    // Hide loading, show results
+                    downloadLoading.style.display = 'none';
+                    downloadResults.style.display = 'block';
+                    
+                    // Store formats
+                    availableFormats = data.formats;
+                    
+                    // Set video thumbnail
+                    const videoId = data.video_id;
+                    downloadVideoThumbnail.src = `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`;
+                    
+                    // Update video info
+                    downloadVideoTitle.textContent = data.title;
+                    downloadVideoAuthor.textContent = data.author;
+                    downloadVideoDuration.textContent = formatDuration(data.length_seconds);
+                    
+                    // Display formats (default to video)
+                    displayFormats('video');
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    downloadLoading.style.display = 'none';
+                    showDownloadError(error.message || 'Failed to fetch video formats');
+                });
+            });
+            
+            // Switch between video and audio formats
+            videoFormatsRadio.addEventListener('change', function() {
+                if (this.checked) {
+                    displayFormats('video');
+                }
+            });
+            
+            audioFormatsRadio.addEventListener('change', function() {
+                if (this.checked) {
+                    displayFormats('audio');
+                }
+            });
+            
+            // Sort formats
+            sortOptions.forEach(option => {
+                option.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    currentSortMethod = this.dataset.sort;
+                    
+                    // Update dropdown button text
+                    document.getElementById('sortDropdown').textContent = `Sort By: ${this.textContent}`;
+                    
+                    // Redisplay formats with new sort
+                    const formatType = videoFormatsRadio.checked ? 'video' : 'audio';
+                    displayFormats(formatType);
+                });
+            });
+            
+            // Display formats based on type and sort method
+            function displayFormats(type) {
+                // Filter formats by type
+                let formats = availableFormats.filter(format => {
+                    if (type === 'video') {
+                        return format.has_video;
+                    } else {
+                        return !format.has_video;
+                    }
+                });
+                
+                // Sort formats
+                formats = sortFormats(formats, currentSortMethod);
+                
+                // Clear container
+                formatsContainer.innerHTML = '';
+                
+                // Add formats to container
+                if (formats.length === 0) {
+                    formatsContainer.innerHTML = `<div class="alert alert-info">No ${type} formats available for this video.</div>`;
+                    return;
+                }
+                
+                formats.forEach(format => {
+                    const formatElement = document.createElement('div');
+                    formatElement.className = 'format-option';
+                    
+                    // Format quality/resolution label
+                    let qualityLabel = format.resolution || format.quality;
+                    if (format.fps) {
+                        qualityLabel += ` ${format.fps}fps`;
+                    }
+                    
+                    // Format size (if available)
+                    let sizeLabel = format.file_size ? `${(format.file_size / 1024 / 1024).toFixed(1)} MB` : 'Unknown size';
+                    
+                    formatElement.innerHTML = `
+                        <div class="format-info">
+                            <div class="format-title">${format.mime_type}</div>
+                            <div class="format-details">
+                                <span class="badge bg-primary">${qualityLabel}</span>
+                                <span class="badge bg-secondary">${sizeLabel}</span>
+                                ${format.is_adaptive ? '<span class="badge bg-info">Adaptive</span>' : ''}
+                            </div>
+                        </div>
+                        <button class="btn btn-sm btn-primary download-btn" data-itag="${format.itag}">
+                            <i class="fas fa-download me-1"></i>Download
+                        </button>
+                    `;
+                    
+                    formatsContainer.appendChild(formatElement);
+                });
+                
+                // Add download event listeners
+                document.querySelectorAll('.download-btn').forEach(button => {
+                    button.addEventListener('click', function() {
+                        const itag = this.dataset.itag;
+                        downloadVideo(itag);
+                    });
+                });
+            }
+            
+            // Sort formats based on method
+            function sortFormats(formats, method) {
+                return [...formats].sort((a, b) => {
+                    switch (method) {
+                        case 'quality':
+                            // Higher resolution/quality first
+                            const aRes = parseInt(a.resolution) || 0;
+                            const bRes = parseInt(b.resolution) || 0;
+                            if (aRes !== bRes) return bRes - aRes;
+                            
+                            // If same resolution, higher fps first
+                            const aFps = a.fps || 0;
+                            const bFps = b.fps || 0;
+                            return bFps - aFps;
+                            
+                        case 'size':
+                            // Smaller size first
+                            const aSize = a.file_size || 0;
+                            const bSize = b.file_size || 0;
+                            return aSize - bSize;
+                            
+                        case 'type':
+                            // Group by mime type
+                            return a.mime_type.localeCompare(b.mime_type);
+                            
+                        default:
+                            return 0;
+                    }
+                });
+            }
+            
+            // Download video with selected format
+            function downloadVideo(itag) {
+                const youtubeUrl = downloadYoutubeUrlInput.value.trim();
+                
+                // Show loading indicator or message
+                Swal.fire({
+                    title: 'Preparing download...',
+                    html: 'Please wait while we prepare your download.',
+                    allowOutsideClick: false,
+                    didOpen: () => {
+                        Swal.showLoading();
+                    }
+                });
+                
+                // Call the download API with Turnstile
+                withTurnstile('download', {
+                    youtube_url: youtubeUrl,
+                    itag: itag
+                })
+                .then(data => {
+                    Swal.close();
+                    
+                    // Create download link
+                    const downloadLink = document.createElement('a');
+                    downloadLink.href = data.download_url;
+                    downloadLink.download = data.filename;
+                    document.body.appendChild(downloadLink);
+                    downloadLink.click();
+                    document.body.removeChild(downloadLink);
+                    
+                    // Show success message
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Download started!',
+                        text: `Your file "${data.filename}" is being downloaded.`,
+                        timer: 3000
+                    });
+                })
+                .catch(error => {
+                    console.error('Download error:', error);
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Download failed',
+                        text: error.message || 'Failed to download video',
+                    });
+                });
+            }
+            
+            // Show error message in download tab
+            function showDownloadError(message) {
+                downloadErrorMessage.textContent = message;
+                downloadErrorMessage.style.display = 'block';
+                downloadLoading.style.display = 'none';
+                
+                // Scroll to error message
+                downloadErrorMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            
+            // Also allow pressing Enter to submit in download tab
+            downloadYoutubeUrlInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    fetchFormatsBtn.click();
+                }
+            });
+        });
+    </script>
+</body>
+</html>

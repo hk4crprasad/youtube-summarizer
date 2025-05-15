@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IP Logs - YouTube Video Summarizer</title>
+    <link rel="icon" href="{{ url_for('static', filename='yt.svg') }}" type="image/svg+xml">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" onload="initTurnstile()"></script>
+    <style>
+        :root {
+            /* Light Theme Colors */
+            --primary-color: #ff4757;
+            --secondary-color: #2e86de;
+            --dark-color: #2f3542;
+            --light-color: #f5f6fa;
+            --success-color: #4cd137;
+            --warning-color: #ffa502;
+            --danger-color: #e84118;
+            --card-bg: #ffffff;
+            --body-bg: #f5f6fa;
+            --text-color: #333333;
+            --text-muted: #6c757d;
+            --border-color: #e0e0e0;
+            --code-bg: #f8f9fa;
+            --transition-speed: 0.3s;
+            --border-radius: 8px;
+            --box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Dark Mode Colors */
+        [data-theme="dark"] {
+            --primary-color: #ff6b81;
+            --secondary-color: #54a0ff;
+            --dark-color: #1e272e;
+            --light-color: #d2dae2;
+            --card-bg: #2a303c;
+            --body-bg: #1a1d24;
+            --text-color: #e2e8f0;
+            --text-muted: #9ca3af;
+            --border-color: #3f4756;
+            --code-bg: #2d333b;
+            --box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+        
+        body {
+            padding-top: 2rem;
+            background-color: var(--body-bg);
+            color: var(--text-color);
+            font-family: 'Poppins', sans-serif;
+            transition: all var(--transition-speed) ease;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1000px;
+        }
+        
+        .card {
+            margin-bottom: 20px;
+            box-shadow: var(--box-shadow);
+            border-radius: var(--border-radius);
+            border: none;
+            overflow: hidden;
+            background-color: var(--card-bg);
+            transition: all var(--transition-speed) ease;
+        }
+        
+        .card-header {
+            background-color: var(--primary-color);
+            color: white;
+            font-weight: 600;
+            padding: 14px 20px;
+            border-bottom: none;
+        }
+        
+        .card-body {
+            padding: 20px;
+        }
+        
+        .btn-primary {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+            transition: all 0.2s ease;
+        }
+        
+        .btn-primary:hover {
+            background-color: var(--danger-color);
+            border-color: var(--danger-color);
+            transform: translateY(-2px);
+        }
+        
+        .btn-secondary {
+            background-color: var(--secondary-color);
+            border-color: var(--secondary-color);
+            transition: all 0.2s ease;
+        }
+        
+        .btn-secondary:hover {
+            opacity: 0.9;
+            transform: translateY(-2px);
+        }
+        
+        .theme-switch {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            color: var(--text-color);
+        }
+        
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+            margin-left: 8px;
+        }
+        
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--text-muted);
+            transition: .4s;
+            border-radius: 24px;
+        }
+        
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .slider {
+            background-color: var(--primary-color);
+        }
+        
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+        
+        .log-entry {
+            font-family: 'Roboto Mono', monospace;
+            font-size: 0.85rem;
+            border-bottom: 1px solid var(--border-color);
+            padding: 8px 0;
+        }
+        
+        .log-date {
+            font-weight: 500;
+            color: var(--secondary-color);
+        }
+        
+        .log-ip {
+            font-weight: 500;
+        }
+        
+        .log-route {
+            color: var(--primary-color);
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .filter-bar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .filter-bar .form-control {
+            max-width: 200px;
+            background-color: var(--card-bg);
+            color: var(--text-color);
+            border-color: var(--border-color);
+        }
+        
+        .filter-bar .form-control:focus {
+            border-color: var(--primary-color);
+            box-shadow: none;
+        }
+        
+        #logs-container {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        
+        @media (max-width: 768px) {
+            .filter-bar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .filter-bar .form-control {
+                max-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="theme-switch">
+        <label for="theme-toggle"><i class="fas fa-moon"></i></label>
+        <label class="switch">
+            <input type="checkbox" id="theme-toggle">
+            <span class="slider"></span>
+        </label>
+    </div>
+
+    <div class="container">
+        <div class="text-center mb-4">
+            <h1 class="fw-bold"><i class="fa-solid fa-shield-alt me-2" style="color: #e51f33;"></i> IP Logs</h1>
+            <p class="text-muted">
+                Protected access to visitor IP address information
+            </p>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-fingerprint me-2"></i>Visitor Logs</span>
+                <div>
+                    <button id="refresh-btn" class="btn btn-sm btn-outline-light">
+                        <i class="fas fa-sync-alt me-1"></i> Refresh
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="filter-bar">
+                    <input type="text" class="form-control" id="ip-filter" placeholder="Filter by IP">
+                    <input type="text" class="form-control" id="route-filter" placeholder="Filter by route">
+                    <input type="text" class="form-control" id="date-filter" placeholder="Filter by date">
+                    <button id="clear-filters" class="btn btn-sm btn-outline-secondary">
+                        <i class="fas fa-times me-1"></i> Clear Filters
+                    </button>
+                </div>
+                
+                <div class="loading" id="loading">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Loading logs...</p>
+                </div>
+                
+                <div id="logs-container">
+                    <div class="alert alert-info text-center" id="no-logs" style="display:none;">
+                        <i class="fas fa-info-circle me-2"></i> No logs found.
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="fas fa-chart-pie me-2"></i>Statistics
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-4 mb-3">
+                        <div class="p-3 rounded bg-light">
+                            <h5 id="total-visits">0</h5>
+                            <p class="text-muted mb-0">Total Visits</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="p-3 rounded bg-light">
+                            <h5 id="unique-ips">0</h5>
+                            <p class="text-muted mb-0">Unique IPs</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="p-3 rounded bg-light">
+                            <h5 id="most-visited-route">-</h5>
+                            <p class="text-muted mb-0">Most Visited Route</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="cf-turnstile" data-sitekey="{{ TURNSTILE_SITE_KEY }}" id="turnstile-container"></div>
+
+        <div class="mt-4 text-center">
+            <a href="/" class="btn btn-secondary">
+                <i class="fas fa-home me-2"></i>Back to Home
+            </a>
+        </div>
+    </div>
+    
+    <footer class="text-center text-muted mt-4 mb-3">
+        <p><small>Built by Haraprasad with <i class="fas fa-heart" style="color:var(--primary-color)"></i> using Azure OpenAI</small></p>
+    </footer>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Declare global variables for Cloudflare Turnstile
+        let widgetId = null;
+        
+        function initTurnstile() {
+            // Reset if already rendered
+            if (widgetId) {
+                turnstile.reset(widgetId);
+            }
+            
+            // Render the widget with explicit callback
+            widgetId = turnstile.render('#turnstile-container', {
+                sitekey: '{{ TURNSTILE_SITE_KEY }}',
+                callback: onTurnstileSuccess
+            });
+        }
+        
+        window.initTurnstile = initTurnstile;
+        
+        function onTurnstileSuccess(token) {
+            // Once verified, fetch the logs
+            fetchLogs(token);
+        }
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            // Theme toggle functionality
+            const themeToggle = document.getElementById('theme-toggle');
+            
+            // Check for saved theme preference
+            if (localStorage.getItem('theme') === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                themeToggle.checked = true;
+            }
+            
+            // Handle theme toggle
+            themeToggle.addEventListener('change', function() {
+                if (this.checked) {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                    localStorage.setItem('theme', 'dark');
+                } else {
+                    document.documentElement.setAttribute('data-theme', 'light');
+                    localStorage.setItem('theme', 'light');
+                }
+            });
+            
+            // Refresh button
+            document.getElementById('refresh-btn').addEventListener('click', function() {
+                turnstile.reset(widgetId);
+                document.getElementById('logs-container').innerHTML = '';
+                document.getElementById('loading').style.display = 'block';
+                document.getElementById('no-logs').style.display = 'none';
+                
+                // Re-validate turnstile to get a new token
+                initTurnstile();
+            });
+            
+            // Filter functionality
+            const ipFilter = document.getElementById('ip-filter');
+            const routeFilter = document.getElementById('route-filter');
+            const dateFilter = document.getElementById('date-filter');
+            
+            function applyFilters() {
+                const ipValue = ipFilter.value.toLowerCase();
+                const routeValue = routeFilter.value.toLowerCase();
+                const dateValue = dateFilter.value.toLowerCase();
+                
+                const logEntries = document.querySelectorAll('.log-entry');
+                let visibleCount = 0;
+                
+                logEntries.forEach(entry => {
+                    const ip = entry.querySelector('.log-ip').textContent.toLowerCase();
+                    const route = entry.querySelector('.log-route').textContent.toLowerCase();
+                    const date = entry.querySelector('.log-date').textContent.toLowerCase();
+                    
+                    const matchesIp = ipValue === '' || ip.includes(ipValue);
+                    const matchesRoute = routeValue === '' || route.includes(routeValue);
+                    const matchesDate = dateValue === '' || date.includes(dateValue);
+                    
+                    if (matchesIp && matchesRoute && matchesDate) {
+                        entry.style.display = '';
+                        visibleCount++;
+                    } else {
+                        entry.style.display = 'none';
+                    }
+                });
+                
+                if (visibleCount === 0 && logEntries.length > 0) {
+                    document.getElementById('no-logs').style.display = 'block';
+                    document.getElementById('no-logs').textContent = 'No logs match your filters.';
+                } else {
+                    document.getElementById('no-logs').style.display = 'none';
+                }
+            }
+            
+            ipFilter.addEventListener('input', applyFilters);
+            routeFilter.addEventListener('input', applyFilters);
+            dateFilter.addEventListener('input', applyFilters);
+            
+            // Clear filters
+            document.getElementById('clear-filters').addEventListener('click', function() {
+                ipFilter.value = '';
+                routeFilter.value = '';
+                dateFilter.value = '';
+                applyFilters();
+            });
+        });
+        
+        function fetchLogs(token) {
+            const logsContainer = document.getElementById('logs-container');
+            const loadingEl = document.getElementById('loading');
+            const noLogsEl = document.getElementById('no-logs');
+            
+            loadingEl.style.display = 'block';
+            logsContainer.innerHTML = '';
+            noLogsEl.style.display = 'none';
+            
+            fetch('/api/ip-logs', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'cf-turnstile-response': token
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Verification failed or server error');
+                }
+                return response.json();
+            })
+            .then(data => {
+                loadingEl.style.display = 'none';
+                
+                if (!data.logs || data.logs.length === 0) {
+                    noLogsEl.style.display = 'block';
+                    return;
+                }
+                
+                // Process logs
+                const logs = data.logs;
+                displayLogs(logs);
+                calculateStats(logs);
+            })
+            .catch(error => {
+                loadingEl.style.display = 'none';
+                logsContainer.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i> Error: ${error.message}
+                    </div>
+                `;
+            });
+        }
+        
+        function displayLogs(logs) {
+            const logsContainer = document.getElementById('logs-container');
+            
+            logs.forEach(log => {
+                const logEntry = document.createElement('div');
+                logEntry.className = 'log-entry';
+                
+                // Extract components using regex
+                const dateMatch = log.match(/\[(.*?)\]/);
+                const ipMatch = log.match(/IP: (.*?) \|/);
+                const routeMatch = log.match(/Route: (.*?) \|/);
+                const uaMatch = log.match(/UA: (.*?) \|/);
+                const refMatch = log.match(/Ref: (.*?)$/);
+                
+                const date = dateMatch ? dateMatch[1] : 'Unknown Date';
+                const ip = ipMatch ? ipMatch[1] : 'Unknown IP';
+                const route = routeMatch ? routeMatch[1] : 'Unknown Route';
+                const ua = uaMatch ? uaMatch[1] : 'Unknown User Agent';
+                const ref = refMatch ? refMatch[1] : 'Unknown Referrer';
+                
+                logEntry.innerHTML = `
+                    <div><span class="log-date">${date}</span></div>
+                    <div>IP: <span class="log-ip">${ip}</span> | Route: <span class="log-route">${route}</span></div>
+                    <div class="text-muted small">UA: ${ua}</div>
+                    <div class="text-muted small">Referrer: ${ref}</div>
+                `;
+                
+                logsContainer.appendChild(logEntry);
+            });
+        }
+        
+        function calculateStats(logs) {
+            // Calculate unique IPs
+            const ips = new Set();
+            const routes = {};
+            
+            logs.forEach(log => {
+                const ipMatch = log.match(/IP: (.*?) \|/);
+                const routeMatch = log.match(/Route: (.*?) \|/);
+                
+                if (ipMatch) {
+                    ips.add(ipMatch[1]);
+                }
+                
+                if (routeMatch) {
+                    const route = routeMatch[1];
+                    routes[route] = (routes[route] || 0) + 1;
+                }
+            });
+            
+            // Find most visited route
+            let mostVisitedRoute = '-';
+            let maxVisits = 0;
+            
+            for (const [route, visits] of Object.entries(routes)) {
+                if (visits > maxVisits) {
+                    mostVisitedRoute = route;
+                    maxVisits = visits;
+                }
+            }
+            
+            // Update stats display
+            document.getElementById('total-visits').textContent = logs.length;
+            document.getElementById('unique-ips').textContent = ips.size;
+            document.getElementById('most-visited-route').textContent = mostVisitedRoute;
+        }
+    </script>
+</body>
+</html>

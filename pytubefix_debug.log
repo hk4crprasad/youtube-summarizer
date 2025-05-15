@@ -1,0 +1,138 @@
+2025-05-15 07:17:06,631 - INFO - 📥 Initializing YouTube object for URL: https://youtube.com/watch?v=2lAe1cqCOXo
+2025-05-15 07:17:06,632 - DEBUG - matched regex search: (?:v=|\/)([0-9A-Za-z_-]{11}).*
+2025-05-15 07:17:07,539 - DEBUG - finding initial function name
+2025-05-15 07:17:07,541 - DEBUG - Pattern failed: ytplayer\.config\s*=\s*
+2025-05-15 07:17:07,541 - DEBUG - Could not parse object.
+2025-05-15 07:17:07,543 - DEBUG - finished regex search, matched: (/s/player/[\w\d]+/[\w\d_/.]+/base\.js)
+2025-05-15 07:17:07,543 - DEBUG - player JS: /s/player/b2858d36/player_ias.vflset/en_US/base.js
+2025-05-15 07:17:07,660 - DEBUG - matched regex search: signatureTimestamp:(\d*)
+2025-05-15 07:17:07,660 - DEBUG - Looking for visitorData in InnerTube API
+2025-05-15 07:17:07,877 - DEBUG - VisitorData obtained successfully
+2025-05-15 07:17:39,483 - DEBUG - Found title in vid_details
+2025-05-15 07:17:39,483 - INFO - ✅ Video Title: YouTube Rewind 2019: For the Record | #YouTubeRewind
+2025-05-15 07:17:39,483 - INFO - 📦 Fetching highest resolution stream...
+2025-05-15 07:17:39,483 - DEBUG - applying descrambler
+2025-05-15 07:17:39,483 - DEBUG - looking for signature cipher name
+2025-05-15 07:17:39,879 - DEBUG - finished regex search, matched: \b(?P<var>[a-zA-Z0-9_$]+)&&\((?P=var)=(?P<sig>[a-zA-Z0-9_$]{2,})\(decodeURIComponent\((?P=var)\)\)
+2025-05-15 07:17:39,879 - DEBUG - Signature cipher function name: eOD
+2025-05-15 07:17:39,879 - DEBUG - looking for nsig name
+2025-05-15 07:17:39,879 - DEBUG - Global Obj name is: T
+2025-05-15 07:17:39,882 - DEBUG - Successfully interpreted global object
+2025-05-15 07:17:39,883 - DEBUG - _w8_ found in index 57
+2025-05-15 07:17:39,887 - DEBUG - Nfunc name is: dlX
+2025-05-15 07:17:39,887 - DEBUG - signature found, skip decipher
+2025-05-15 07:17:39,888 - DEBUG - Parameter n is: gCJWnpa_pbezWFrK
+2025-05-15 07:17:40,603 - DEBUG - Parameter n deciphered: OURe3Vi9TLMVaA
+2025-05-15 07:17:40,603 - DEBUG - signature found, skip decipher
+2025-05-15 07:17:40,603 - DEBUG - Parameter n is: rl92QUS5Az0xqqsr
+2025-05-15 07:17:41,308 - DEBUG - Parameter n deciphered: SXpUY9IfTuApDg
+2025-05-15 07:17:41,308 - DEBUG - signature found, skip decipher
+2025-05-15 07:17:41,308 - DEBUG - Parameter n is: rl92QUS5Az0xqqsr
+2025-05-15 07:17:41,308 - DEBUG - Parameter n found skipping decryption
+2025-05-15 07:17:41,308 - DEBUG - Parameter n deciphered: SXpUY9IfTuApDg
+2025-05-15 07:17:41,308 - DEBUG - signature found, skip decipher
+2025-05-15 07:17:41,309 - DEBUG - Parameter n is: rl92QUS5Az0xqqsr
+2025-05-15 07:17:41,309 - DEBUG - Parameter n found skipping decryption
+2025-05-15 07:17:41,309 - DEBUG - Parameter n deciphered: SXpUY9IfTuApDg
+2025-05-15 07:17:41,309 - DEBUG - signature found, skip decipher
+2025-05-15 07:17:41,309 - DEBUG - Parameter n is: rl92QUS5Az0xqqsr
+2025-05-15 07:17:41,309 - DEBUG - Parameter n found skipping decryption
+2025-05-15 07:17:41,309 - DEBUG - Parameter n deciphered: SXpUY9IfTuApDg
+2025-05-15 07:17:41,309 - DEBUG - signature found, skip decipher
+2025-05-15 07:17:41,309 - DEBUG - Parameter n is: rl92QUS5Az0xqqsr
+2025-05-15 07:17:41,309 - DEBUG - Parameter n found skipping decryption
+2025-05-15 07:17:41,309 - DEBUG - Parameter n deciphered: SXpUY9IfTuApDg
+2025-05-15 07:17:41,310 - DEBUG - signature found, skip decipher
+2025-05-15 07:17:41,310 - DEBUG - Parameter n is: rl92QUS5Az0xqqsr
+2025-05-15 07:17:41,310 - DEBUG - Parameter n found skipping decryption
+2025-05-15 07:17:41,310 - DEBUG - Parameter n deciphered: SXpUY9IfTuApDg
+2025-05-15 07:17:41,310 - DEBUG - signature found, skip decipher
+2025-05-15 07:17:41,310 - DEBUG - Parameter n is: rl92QUS5Az0xqqsr
+2025-05-15 07:17:41,310 - DEBUG - Parameter n found skipping decryption
+2025-05-15 07:17:41,310 - DEBUG - Parameter n deciphered: SXpUY9IfTuApDg
+2025-05-15 07:17:41,310 - DEBUG - signature found, skip decipher
+2025-05-15 07:17:41,310 - DEBUG - Parameter n is: rl92QUS5Az0xqqsr
+2025-05-15 07:17:41,310 - DEBUG - Parameter n found skipping decryption
+2025-05-15 07:17:41,310 - DEBUG - Parameter n deciphered: SXpUY9IfTuApDg
+2025-05-15 07:17:41,310 - DEBUG - signature found, skip decipher
+2025-05-15 07:17:41,310 - DEBUG - Parameter n is: rl92QUS5Az0xqqsr
+2025-05-15 07:17:41,311 - DEBUG - Parameter n found skipping decryption
+2025-05-15 07:17:41,311 - DEBUG - Parameter n deciphered: SXpUY9IfTuApDg
+2025-05-15 07:17:41,311 - DEBUG - signature found, skip decipher
+2025-05-15 07:17:41,311 - DEBUG - Parameter n is: rl92QUS5Az0xqqsr
+2025-05-15 07:17:41,311 - DEBUG - Parameter n found skipping decryption
+2025-05-15 07:17:41,311 - DEBUG - Parameter n deciphered: SXpUY9IfTuApDg
+2025-05-15 07:17:41,311 - DEBUG - signature found, skip decipher
+2025-05-15 07:17:41,311 - DEBUG - Parameter n is: rl92QUS5Az0xqqsr
+2025-05-15 07:17:41,311 - DEBUG - Parameter n found skipping decryption
+2025-05-15 07:17:41,311 - DEBUG - Parameter n deciphered: SXpUY9IfTuApDg
+2025-05-15 07:17:41,311 - DEBUG - signature found, skip decipher
+2025-05-15 07:17:41,311 - DEBUG - Parameter n is: rl92QUS5Az0xqqsr
+2025-05-15 07:17:41,311 - DEBUG - Parameter n found skipping decryption
+2025-05-15 07:17:41,311 - DEBUG - Parameter n deciphered: SXpUY9IfTuApDg
+2025-05-15 07:17:41,312 - DEBUG - signature found, skip decipher
+2025-05-15 07:17:41,312 - DEBUG - Parameter n is: rl92QUS5Az0xqqsr
+2025-05-15 07:17:41,312 - DEBUG - Parameter n found skipping decryption
+2025-05-15 07:17:41,312 - DEBUG - Parameter n deciphered: SXpUY9IfTuApDg
+2025-05-15 07:17:41,312 - DEBUG - signature found, skip decipher
+2025-05-15 07:17:41,312 - DEBUG - Parameter n is: rl92QUS5Az0xqqsr
+2025-05-15 07:17:41,312 - DEBUG - Parameter n found skipping decryption
+2025-05-15 07:17:41,312 - DEBUG - Parameter n deciphered: SXpUY9IfTuApDg
+2025-05-15 07:17:41,312 - DEBUG - signature found, skip decipher
+2025-05-15 07:17:41,312 - DEBUG - Parameter n is: rl92QUS5Az0xqqsr
+2025-05-15 07:17:41,312 - DEBUG - Parameter n found skipping decryption
+2025-05-15 07:17:41,312 - DEBUG - Parameter n deciphered: SXpUY9IfTuApDg
+2025-05-15 07:17:41,313 - DEBUG - signature found, skip decipher
+2025-05-15 07:17:41,313 - DEBUG - Parameter n is: rl92QUS5Az0xqqsr
+2025-05-15 07:17:41,313 - DEBUG - Parameter n found skipping decryption
+2025-05-15 07:17:41,313 - DEBUG - Parameter n deciphered: SXpUY9IfTuApDg
+2025-05-15 07:17:41,313 - DEBUG - signature found, skip decipher
+2025-05-15 07:17:41,313 - DEBUG - Parameter n is: rl92QUS5Az0xqqsr
+2025-05-15 07:17:41,313 - DEBUG - Parameter n found skipping decryption
+2025-05-15 07:17:41,313 - DEBUG - Parameter n deciphered: SXpUY9IfTuApDg
+2025-05-15 07:17:41,313 - DEBUG - signature found, skip decipher
+2025-05-15 07:17:41,313 - DEBUG - Parameter n is: rl92QUS5Az0xqqsr
+2025-05-15 07:17:41,313 - DEBUG - Parameter n found skipping decryption
+2025-05-15 07:17:41,313 - DEBUG - Parameter n deciphered: SXpUY9IfTuApDg
+2025-05-15 07:17:41,313 - DEBUG - signature found, skip decipher
+2025-05-15 07:17:41,313 - DEBUG - Parameter n is: rl92QUS5Az0xqqsr
+2025-05-15 07:17:41,313 - DEBUG - Parameter n found skipping decryption
+2025-05-15 07:17:41,313 - DEBUG - Parameter n deciphered: SXpUY9IfTuApDg
+2025-05-15 07:17:41,314 - DEBUG - signature found, skip decipher
+2025-05-15 07:17:41,314 - DEBUG - Parameter n is: rl92QUS5Az0xqqsr
+2025-05-15 07:17:41,314 - DEBUG - Parameter n found skipping decryption
+2025-05-15 07:17:41,314 - DEBUG - Parameter n deciphered: SXpUY9IfTuApDg
+2025-05-15 07:17:41,314 - DEBUG - signature found, skip decipher
+2025-05-15 07:17:41,314 - DEBUG - Parameter n is: rl92QUS5Az0xqqsr
+2025-05-15 07:17:41,314 - DEBUG - Parameter n found skipping decryption
+2025-05-15 07:17:41,314 - DEBUG - Parameter n deciphered: SXpUY9IfTuApDg
+2025-05-15 07:17:41,314 - DEBUG - signature found, skip decipher
+2025-05-15 07:17:41,314 - DEBUG - Parameter n is: rl92QUS5Az0xqqsr
+2025-05-15 07:17:41,314 - DEBUG - Parameter n found skipping decryption
+2025-05-15 07:17:41,314 - DEBUG - Parameter n deciphered: SXpUY9IfTuApDg
+2025-05-15 07:17:41,315 - DEBUG - signature found, skip decipher
+2025-05-15 07:17:41,315 - DEBUG - Parameter n is: rl92QUS5Az0xqqsr
+2025-05-15 07:17:41,315 - DEBUG - Parameter n found skipping decryption
+2025-05-15 07:17:41,315 - DEBUG - Parameter n deciphered: SXpUY9IfTuApDg
+2025-05-15 07:17:41,315 - DEBUG - signature found, skip decipher
+2025-05-15 07:17:41,315 - DEBUG - Parameter n is: rl92QUS5Az0xqqsr
+2025-05-15 07:17:41,315 - DEBUG - Parameter n found skipping decryption
+2025-05-15 07:17:41,315 - DEBUG - Parameter n deciphered: SXpUY9IfTuApDg
+2025-05-15 07:17:41,315 - DEBUG - signature found, skip decipher
+2025-05-15 07:17:41,315 - DEBUG - Parameter n is: rl92QUS5Az0xqqsr
+2025-05-15 07:17:41,315 - DEBUG - Parameter n found skipping decryption
+2025-05-15 07:17:41,315 - DEBUG - Parameter n deciphered: SXpUY9IfTuApDg
+2025-05-15 07:17:41,315 - DEBUG - signature found, skip decipher
+2025-05-15 07:17:41,315 - DEBUG - Parameter n is: rl92QUS5Az0xqqsr
+2025-05-15 07:17:41,315 - DEBUG - Parameter n found skipping decryption
+2025-05-15 07:17:41,315 - DEBUG - Parameter n deciphered: SXpUY9IfTuApDg
+2025-05-15 07:17:41,316 - DEBUG - signature found, skip decipher
+2025-05-15 07:17:41,316 - DEBUG - Parameter n is: rl92QUS5Az0xqqsr
+2025-05-15 07:17:41,316 - DEBUG - Parameter n found skipping decryption
+2025-05-15 07:17:41,316 - DEBUG - Parameter n deciphered: SXpUY9IfTuApDg
+2025-05-15 07:17:41,664 - INFO - 🎯 Selected stream: video/mp4, 360p, 17.57MB
+2025-05-15 07:17:41,665 - DEBUG - downloading (18427777 total bytes) file to /home/cp/youtube-mcp-server/youtube-summarizer/YouTube Rewind 2019: For the Record | #YouTubeRewind.mp4
+2025-05-15 07:17:41,927 - DEBUG - download remaining: 8990593
+2025-05-15 07:17:42,087 - DEBUG - download remaining: 0
+2025-05-15 07:17:42,089 - DEBUG - download finished
+2025-05-15 07:17:42,089 - INFO - ✅ Download complete. Saved to: /home/cp/youtube-mcp-server/youtube-summarizer/YouTube Rewind 2019: For the Record | #YouTubeRewind.mp4
