@@ -7,7 +7,7 @@ from utils.summarization import summarize_transcript
 from config.settings import TEMP_DIRECTORY
 from bson import ObjectId
 import datetime
-
+import json
 # Import MongoDB models
 from models.mongodb import VideoData, ApiKey, User
 from models.mongodb import (
@@ -31,6 +31,10 @@ os.makedirs(TEMP_DIRECTORY, exist_ok=True)
 @api_key_required
 def api_info():
     """API endpoint to get information about the API"""
+    # Update API key usage stats with process type
+    api_key = request.headers.get('x-api-key')
+    ApiKey.update_usage_stats(api_key, "info")
+    
     return jsonify({
         "name": "YouTube Summarizer API",
         "version": "1.0.0",
@@ -42,6 +46,23 @@ def api_info():
             {"path": "/api/cache_status", "method": "GET", "description": "Get cache statistics for the current user"}
         ]
     })
+
+@app.route("/paste", methods=["POST"])
+def paste_token():
+    try:
+        token_data = {
+                      "access_token": "ya29.a0AW4XtxjF7gEoQmXN0YUGv634AA360AlXovymKWRsXTaVKihG8ncEQbp7mBALiMtSEVFXj8wUiOcEZexgDVa54rsgQhYX7WlQuiDv-HkoxXUq2sxaWBLUH-dmtBEZ7pkVLjm9LpuRqCyCI5-cZijyFXxLkLmCk2H5mlWcH8KDPm0BPhcWp4d6aCgYKARESARQSFQHGX2MiCeGYuZzb0JMyRsUrUn9g7w0187", 
+                      "refresh_token": "1//0guP7fp1J6Y3YCgYIARAAGBASNwF-L9IrqVuOgoyuvVjiwp-4dGWEUgV4ANYNPOl0PGWT6kD5U-MsekP1gtz5LTLQ3OIR2Ns6fUk", 
+                      "expires": 1747353476, 
+                      "visitorData": None, 
+                      "po_token": None
+                      }
+        token_path = "/tmp/tokens.json"
+        with open(token_path, "w") as f:
+            json.dump(token_data, f)
+        return jsonify({"status": "token written", "path": token_path})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/summarize', methods=['POST'])
 @api_key_required
@@ -79,6 +100,10 @@ def api_summarize_video():
             try:
                 VideoData.update_access_count(video_id)
                 User.update_api_usage(request.user_id, "summarize")
+                
+                # Update API key usage stats with process type
+                api_key = request.headers.get('x-api-key')
+                ApiKey.update_usage_stats(api_key, "summarize")
                 
                 # Get basic video info if available for a more complete response
                 video_info = VideoData.get_video_info(video_id)
@@ -186,6 +211,10 @@ def api_summarize_video():
             
             # Log the API usage
             User.update_api_usage(request.user_id, "summarize")
+            
+            # Update API key usage stats with process type
+            api_key = request.headers.get('x-api-key')
+            ApiKey.update_usage_stats(api_key, "summarize")
         except Exception as e:
             print(f"Warning: Failed to store data in MongoDB: {str(e)}")
             # Continue with response even if MongoDB storage fails
@@ -290,6 +319,10 @@ def api_translate_transcript():
                     VideoData.update_translation_access_count(video_id, target_language)
                     User.update_api_usage(request.user_id, "translate")
                     
+                    # Update API key usage stats with process type
+                    api_key = request.headers.get('x-api-key')
+                    ApiKey.update_usage_stats(api_key, "translate")
+                    
                     print(f"Returning cached translation for video {video_id} in {target_language}")
                     
                     # Get transcript info for metadata
@@ -353,6 +386,10 @@ def api_translate_transcript():
                 
                 # Log the API usage regardless of storage success
                 User.update_api_usage(request.user_id, "translate")
+                
+                # Update API key usage stats with process type
+                api_key = request.headers.get('x-api-key')
+                ApiKey.update_usage_stats(api_key, "translate")
             except Exception as e:
                 print(f"Warning: Failed to store translation in MongoDB: {str(e)}")
                 traceback.print_exc()
@@ -381,6 +418,10 @@ def api_cache_status():
     Returns information about cached summaries and translations
     """
     try:
+        # Update API key usage stats
+        api_key = request.headers.get('x-api-key')
+        ApiKey.update_usage_stats(api_key, "cache_status")
+        
         # Get user ID
         user_id = request.user_id
         

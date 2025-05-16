@@ -1,0 +1,19 @@
+[project]
+name = "youtube-summarizer"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "azure-identity>=1.23.0",
+    "azure-storage-blob>=12.25.1",
+    "ffmpeg-python>=0.2.0",
+    "flask>=3.1.1",
+    "moviepy>=2.1.2",
+    "openai>=1.78.1",
+    "pymongo>=4.13.0",
+    "python-dotenv>=1.1.0",
+    "pytube>=15.0.0",
+    "requests>=2.32.3",
+    "yt-dlp>=2025.4.30",
+]

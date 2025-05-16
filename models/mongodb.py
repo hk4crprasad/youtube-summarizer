@@ -200,6 +200,33 @@ class ApiKey:
             {"$set": {"is_active": False}}
         )
         return result.modified_count > 0
+    
+    @staticmethod
+    def update_usage_stats(key, process_type=None):
+        """Update usage statistics for an API key.
+        
+        Args:
+            key: The API key string
+            process_type: The type of process (e.g., 'summarize', 'translate')
+        """
+        update_data = {
+            "$inc": {"usage.total_requests": 1},
+            "$set": {"usage.last_used": datetime.datetime.now()}
+        }
+        
+        # If process type is specified, increment the specific counter
+        if process_type:
+            update_data["$inc"][f"usage.{process_type}_requests"] = 1
+            
+        try:
+            result = api_keys_collection.update_one(
+                {"key": key},
+                update_data
+            )
+            return result.modified_count > 0
+        except Exception as e:
+            print(f"Error updating API key usage stats: {str(e)}")
+            return False
 
 
 class VideoData:
