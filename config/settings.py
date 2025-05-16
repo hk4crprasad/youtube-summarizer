@@ -13,7 +13,7 @@ AZURE_OPENAI_DEPLOYMENT_NAME = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-4o
 WHISPER_DEPLOYMENT_NAME = "whisper"
 
 # Temporary file storage
-TEMP_DIRECTORY = os.getenv("TEMP_DIRECTORY", "temp")
+TEMP_DIRECTORY = os.getenv("TEMP_DIRECTORY", "/tmp")
 
 # Ensure temp directory exists
 os.makedirs(TEMP_DIRECTORY, exist_ok=True) 

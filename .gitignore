@@ -13,3 +13,7 @@ env/
 **/pytubefix_tokens.json
 **/.env
 .env
+pytubefix_tokens.json
+.python-version
+pyproject.toml
+uv.lock
