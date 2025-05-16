@@ -1,0 +1,15 @@
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.pyw
+*.pyz
+*.pywz
+*.pyzw
+temp/
+package
+**/.venv/
+env/
+**/pytubefix_tokens.json
+**/.env
+.env

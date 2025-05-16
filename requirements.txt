@@ -1,0 +1,12 @@
+python-dotenv
+flask
+requests
+pytube
+openai
+azure-identity
+azure-storage-blob
+ffmpeg-python
+moviepy
+pytubefix
+yt_dlp
+pymongo
