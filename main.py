@@ -19,6 +19,7 @@ from models.mongodb import (
 # Import API middleware
 from models.api_middleware import api_key_required
 
+os.environ["PATH"] = os.path.abspath("ffmpeg/bin") + ":" + os.environ["PATH"]
 app = Flask(__name__)
 secret_key = os.environ.get('FLASK_SECRET_KEY', os.urandom(24).hex())
 app.config['SECRET_KEY'] = secret_key
